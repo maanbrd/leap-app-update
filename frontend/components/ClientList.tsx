@@ -177,11 +177,7 @@ export default function ClientList({ onNavigate }: ClientListProps) {
     setIsModalOpen(false);
   };
 
-  const handleClientUpdate = (updatedClient: Client) => {
-    setClients(clients.map(client => 
-      client.id === updatedClient.id ? updatedClient : client
-    ));
-  };
+
 
   const formatDate = (dateString: string | Date) => {
     const date = new Date(dateString);
@@ -466,7 +462,6 @@ export default function ClientList({ onNavigate }: ClientListProps) {
         client={selectedClient}
         isOpen={isModalOpen}
         onClose={closeModal}
-        onClientUpdate={handleClientUpdate}
       />
     </>
   );

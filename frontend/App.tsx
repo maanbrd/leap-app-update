@@ -87,6 +87,10 @@ export default function App() {
         notes: '',
         createdBy: user?.name || 'Admin'
       });
+
+      setTimeout(() => {
+        setCurrentView('list');
+      }, 1500);
     } catch (error) {
       console.error('Error creating event:', error);
       toast({
