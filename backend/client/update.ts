@@ -91,6 +91,13 @@ export const update = api<UpdateClientRequest, UpdateClientResponse>(
         }
       }
 
+      // Check if there are any fields to update
+      if (req.firstName === undefined && req.lastName === undefined && 
+          req.phone === undefined && req.email === undefined && 
+          req.instagram === undefined && req.messenger === undefined) {
+        throw APIError.invalidArgument("Brak danych do aktualizacji");
+      }
+
       const tx = await db.begin();
       
       try {
