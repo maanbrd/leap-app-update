@@ -1,0 +1,20 @@
+CREATE TABLE events (
+  id BIGSERIAL PRIMARY KEY,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  birth_date DATE,
+  phone TEXT,
+  instagram TEXT,
+  messenger TEXT,
+  email TEXT,
+  event_time TIMESTAMPTZ NOT NULL,
+  service TEXT NOT NULL,
+  price DOUBLE PRECISION NOT NULL,
+  deposit_amount DOUBLE PRECISION,
+  deposit_due_date DATE,
+  deposit_status TEXT NOT NULL DEFAULT 'nie dotyczy' CHECK (deposit_status IN ('zapłacony', 'niezapłacony', 'nie dotyczy')),
+  duration_minutes INTEGER NOT NULL,
+  notes TEXT,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
