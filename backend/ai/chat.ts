@@ -40,6 +40,24 @@ TWOJE FUNKCJE:
 3. Generowanie raportów i statystyk
 4. Pomoc w zarządzaniu kalendarzem
 5. Przygotowywanie treści SMS-ów do zatwierdzenia
+6. USUWANIE rekordów klientów i wydarzeń
+7. AKTUALIZOWANIE statusów zadatków
+8. PRZENOSZENIE wizyt na inne terminy
+
+DOSTĘPNE AKCJE:
+- "DELETE_EVENT [ID]" - usuń wydarzenie o podanym ID
+- "DELETE_CLIENT [ID]" - usuń klienta o podanym ID
+- "UPDATE_DEPOSIT [ID] [STATUS]" - zaktualizuj status zadatku (zapłacony/niezapłacony/nie dotyczy)
+- "MOVE_EVENT [ID] [NOWA_DATA]" - przenieś wizytę na nowy termin
+- "CREATE_SMS [TYP] [DANE]" - przygotuj SMS
+
+Gdy użytkownik poprosi o wykonanie jednej z tych akcji, odpowiedz w formacie:
+AKCJA: [kod_akcji]
+WYJAŚNIENIE: [co zrobisz]
+
+Przykład:
+AKCJA: DELETE_EVENT 123
+WYJAŚNIENIE: Usunę wizytę o ID 123
 
 ZASADY:
 - Zawsze rozmawiaj po polsku
@@ -70,54 +88,78 @@ export const chat = api(
     try {
       const openai = createOpenAI({ apiKey: openAIKey() });
 
-      // Pobierz kontekst z bazy danych
-      const clients = await db.queryAll<Client>`
-        SELECT 
-          id, 
-          first_name as "firstName", 
-          last_name as "lastName", 
-          birth_date as "birthDate", 
-          phone, 
-          instagram, 
-          messenger, 
-          email, 
-          created_by as "createdBy", 
-          created_at as "createdAt"
-        FROM clients
-        WHERE created_by = ${req.userId} OR ${req.userId} = 'manager'
-        ORDER BY created_at DESC
-        LIMIT 50
-      `;
-
-      const events = await db.queryAll<Event>`
-        SELECT 
-          id,
-          first_name as "firstName",
-          last_name as "lastName", 
-          birth_date as "birthDate",
-          phone,
-          instagram,
-          messenger,
-          email,
-          event_time as "eventTime",
-          service,
-          price,
-          deposit_amount as "depositAmount",
-          deposit_due_date as "depositDueDate",
-          deposit_status as "depositStatus",
-          duration_minutes as "durationMinutes",
-          notes,
-          created_by as "createdBy",
-          created_at as "createdAt"
-        FROM events
-        WHERE created_by = ${req.userId} OR ${req.userId} = 'manager'
-        ORDER BY event_time ASC
-        LIMIT 50
-      `;
+      // Pobierz kontekst z bazy danych oraz preferencje użytkownika
+      const [clients, events, userPrefs] = await Promise.all([
+        db.queryAll<Client>`
+          SELECT 
+            id, 
+            first_name as "firstName", 
+            last_name as "lastName", 
+            birth_date as "birthDate", 
+            phone, 
+            instagram, 
+            messenger, 
+            email, 
+            created_by as "createdBy", 
+            created_at as "createdAt"
+          FROM clients
+          WHERE created_by = ${req.userId} OR ${req.userId} = 'manager'
+          ORDER BY created_at DESC
+          LIMIT 50
+        `,
+        
+        db.queryAll<Event>`
+          SELECT 
+            id,
+            first_name as "firstName",
+            last_name as "lastName", 
+            birth_date as "birthDate",
+            phone,
+            instagram,
+            messenger,
+            email,
+            event_time as "eventTime",
+            service,
+            price,
+            deposit_amount as "depositAmount",
+            deposit_due_date as "depositDueDate",
+            deposit_status as "depositStatus",
+            duration_minutes as "durationMinutes",
+            notes,
+            created_by as "createdBy",
+            created_at as "createdAt"
+          FROM events
+          WHERE created_by = ${req.userId} OR ${req.userId} = 'manager'
+          ORDER BY event_time ASC
+          LIMIT 50
+        `,
+        
+        // Pobierz preferencje użytkownika
+        (async () => {
+          try {
+            const prefs = await db.queryAll<{
+              service: string;
+              avg_price: number;
+              count: number;
+            }>`
+              SELECT service, AVG(price) as avg_price, COUNT(*) as count
+              FROM events 
+              WHERE created_by = ${req.userId}
+              GROUP BY service
+              ORDER BY count DESC
+              LIMIT 5
+            `;
+            return prefs;
+          } catch {
+            return [];
+          }
+        })()
+      ]);
 
       const contextData = {
         clients: clients.length > 0 ? clients : "Brak klientów",
-        events: events.length > 0 ? events : "Brak wydarzeń",
+        events: events.length > 0 ? events : "Brak wydarzeń", 
+        userPreferences: userPrefs.length > 0 ? userPrefs : "Brak historii",
         currentDate: new Date().toISOString(),
         userId: req.userId
       };
@@ -126,6 +168,7 @@ export const chat = api(
 AKTUALNE DANE UŻYTKOWNIKA:
 Klienci: ${JSON.stringify(contextData.clients, null, 2)}
 Wydarzenia: ${JSON.stringify(contextData.events, null, 2)}
+Preferencje użytkownika: ${JSON.stringify(contextData.userPreferences, null, 2)}
 Data: ${contextData.currentDate}
 ID użytkownika: ${contextData.userId}
 `;

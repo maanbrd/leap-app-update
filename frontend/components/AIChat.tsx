@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Loader2 } from 'lucide-react';
+import { Bot, X, Send, Loader2, Calendar, MessageSquare, Trash2, Edit, Clock, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import backend from '~backend/client';
 
@@ -24,7 +25,11 @@ export default function AIChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
+  const [userId] = useState('current_user'); // TODO: Pobierz z kontekstu autoryzacji
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showQuickActions, setShowQuickActions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -43,6 +48,33 @@ export default function AIChat() {
       loadSession();
     }
   }, [isOpen, sessionId]);
+
+  // Załaduj sugestie przy otwarciu
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      loadSuggestions();
+    }
+  }, [isOpen]);
+
+  const loadSuggestions = async () => {
+    try {
+      const prefs = await backend.ai.getUserPreferences({ userId });
+      const quickSuggestions = [
+        'Pokaż dzisiejsze wizyty',
+        'Ile zarobiliśmy w tym tygodniu?',
+        'Sprawdź niepłacone zadatki',
+        'Kto ma wizytę jutro?'
+      ];
+      
+      if (prefs.preferences.commonServices.length > 0) {
+        quickSuggestions.push(`Dodaj wizytę ${prefs.preferences.commonServices[0]}`);
+      }
+      
+      setSuggestions(quickSuggestions);
+    } catch (error) {
+      console.error('Błąd ładowania sugestii:', error);
+    }
+  };
 
   const loadSession = async () => {
     if (!sessionId) return;
@@ -70,7 +102,7 @@ export default function AIChat() {
     try {
       await backend.ai.saveMessage({
         sessionId: currentSessionId,
-        userId: 'current_user', // TODO: Pobierz z kontekstu autoryzacji
+        userId,
         role,
         content
       });
@@ -79,30 +111,140 @@ export default function AIChat() {
     }
   };
 
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+  const logInteraction = async (action: string, feedback?: 'positive' | 'negative', context?: any) => {
+    try {
+      await backend.ai.logUserInteraction({
+        sessionId: sessionId || 'temp',
+        userId,
+        action,
+        feedback,
+        context
+      });
+    } catch (error) {
+      console.error('Błąd logowania interakcji:', error);
+    }
+  };
+
+  const handleAIActions = async (response: string) => {
+    // Wykryj akcje w odpowiedzi AI
+    const actionMatch = response.match(/AKCJA:\s*([A-Z_]+)\s*(\d+)?(?:\s+(.+))?/);
+    if (!actionMatch) return;
+
+    const [, actionType, id, params] = actionMatch;
+    
+    try {
+      switch (actionType) {
+        case 'DELETE_EVENT':
+          if (id) {
+            const result = await backend.ai.deleteEvent({
+              id: parseInt(id),
+              userId
+            });
+            
+            const resultMessage: ChatMessage = {
+              id: `msg_${Date.now()}_system`,
+              role: 'assistant',
+              content: result.success ? `✅ ${result.message}` : `❌ ${result.message}`,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, resultMessage]);
+            await logInteraction('delete_event', result.success ? 'positive' : 'negative', { eventId: id });
+          }
+          break;
+
+        case 'DELETE_CLIENT':
+          if (id) {
+            const result = await backend.ai.deleteClient({
+              id: parseInt(id),
+              userId
+            });
+            
+            const resultMessage: ChatMessage = {
+              id: `msg_${Date.now()}_system`,
+              role: 'assistant',
+              content: result.success ? `✅ ${result.message}` : `❌ ${result.message}`,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, resultMessage]);
+            await logInteraction('delete_client', result.success ? 'positive' : 'negative', { clientId: id });
+          }
+          break;
+
+        case 'UPDATE_DEPOSIT':
+          if (id && params) {
+            const status = params.trim() as 'zapłacony' | 'niezapłacony' | 'nie dotyczy';
+            const result = await backend.ai.updateDepositStatus({
+              id: parseInt(id),
+              depositStatus: status,
+              userId
+            });
+            
+            const resultMessage: ChatMessage = {
+              id: `msg_${Date.now()}_system`,
+              role: 'assistant',
+              content: result.success ? `✅ ${result.message}` : `❌ ${result.message}`,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, resultMessage]);
+            await logInteraction('update_deposit', result.success ? 'positive' : 'negative', { eventId: id, status });
+          }
+          break;
+
+        case 'MOVE_EVENT':
+          if (id && params) {
+            const result = await backend.ai.moveEvent({
+              id: parseInt(id),
+              newEventTime: params.trim(),
+              userId
+            });
+            
+            const resultMessage: ChatMessage = {
+              id: `msg_${Date.now()}_system`,
+              role: 'assistant',
+              content: result.success ? `✅ ${result.message}` : `❌ ${result.message}`,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, resultMessage]);
+            await logInteraction('move_event', result.success ? 'positive' : 'negative', { eventId: id, newTime: params });
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Błąd wykonywania akcji AI:', error);
+      toast({
+        title: "Błąd",
+        description: "Nie udało się wykonać akcji",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const sendMessage = async (messageText?: string) => {
+    const textToSend = messageText || inputMessage;
+    if (!textToSend.trim() || isLoading) return;
 
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}_user`,
       role: 'user',
-      content: inputMessage,
+      content: textToSend,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
-    await saveMessage('user', inputMessage);
+    await saveMessage('user', textToSend);
+    await logInteraction('send_message', undefined, { message: textToSend });
     
-    const currentMessage = inputMessage;
-    setInputMessage('');
+    if (!messageText) setInputMessage('');
     setIsLoading(true);
+    setIsTyping(true);
 
     try {
       const currentSessionId = sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       const response = await backend.ai.chat({
-        message: currentMessage,
+        message: textToSend,
         sessionId: currentSessionId,
-        userId: 'current_user' // TODO: Pobierz z kontekstu autoryzacji
+        userId
       });
 
       if (!sessionId) {
@@ -118,15 +260,20 @@ export default function AIChat() {
 
       setMessages(prev => [...prev, assistantMessage]);
       await saveMessage('assistant', response.response);
+      await logInteraction('receive_response', 'positive', { response: response.response });
+
+      // Sprawdź czy odpowiedź zawiera akcje do wykonania
+      await handleAIActions(response.response);
 
       // Obsłuż akcje jeśli są dostępne
       if (response.actions && response.actions.length > 0) {
-        // TODO: Zaimplementuj obsługę akcji AI
         console.log('Dostępne akcje AI:', response.actions);
+        await logInteraction('ai_actions_available', undefined, { actions: response.actions });
       }
 
     } catch (error) {
       console.error('Błąd wysyłania wiadomości:', error);
+      await logInteraction('send_message_error', 'negative', { error: (error as Error).message });
       toast({
         title: "Błąd",
         description: "Nie udało się wysłać wiadomości do AI",
@@ -134,6 +281,7 @@ export default function AIChat() {
       });
     } finally {
       setIsLoading(false);
+      setIsTyping(false);
     }
   };
 
@@ -143,6 +291,47 @@ export default function AIChat() {
       sendMessage();
     }
   };
+
+  const QuickActionButtons = () => (
+    <div className="flex flex-wrap gap-2 mb-4">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => sendMessage('Umów nową wizytę')}
+        className="text-xs"
+      >
+        <Calendar className="h-3 w-3 mr-1" />
+        Umów wizytę
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => sendMessage('Pokaż niepłacone zadatki')}
+        className="text-xs"
+      >
+        <Clock className="h-3 w-3 mr-1" />
+        Zadatki
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => sendMessage('Wyślij SMS przypomnienie')}
+        className="text-xs"
+      >
+        <MessageSquare className="h-3 w-3 mr-1" />
+        Wyślij SMS
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => sendMessage('Pokaż dzisiejsze wizyty')}
+        className="text-xs"
+      >
+        <Users className="h-3 w-3 mr-1" />
+        Dzisiejsze wizyty
+      </Button>
+    </div>
+  );
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('pl-PL', { 
@@ -178,11 +367,33 @@ export default function AIChat() {
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col p-0">
+        {/* Przyciski szybkich akcji */}
+        {messages.length === 0 && (
+          <div className="p-4 border-b">
+            <QuickActionButtons />
+          </div>
+        )}
+        
         {/* Obszar wiadomości */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
-            <div className="text-center text-muted-foreground text-sm">
-              Witaj! Jestem AI asystentem studia tatuażu. Jak mogę Ci pomóc?
+            <div className="text-center text-muted-foreground text-sm space-y-2">
+              <p>Witaj! Jestem AI asystentem studia tatuażu.</p>
+              <p>Wybierz jedną z szybkich akcji lub napisz do mnie!</p>
+              {suggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1 justify-center mt-3">
+                  {suggestions.slice(0, 3).map((suggestion, index) => (
+                    <Badge
+                      key={index}
+                      variant="secondary"
+                      className="cursor-pointer text-xs"
+                      onClick={() => sendMessage(suggestion)}
+                    >
+                      {suggestion}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           
@@ -208,10 +419,11 @@ export default function AIChat() {
             </div>
           ))}
           
-          {isLoading && (
+          {isTyping && (
             <div className="flex justify-start">
-              <div className="bg-muted rounded-lg px-3 py-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="bg-muted rounded-lg px-3 py-2 text-sm flex items-center space-x-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="text-xs text-muted-foreground">AI pisze...</span>
               </div>
             </div>
           )}
@@ -231,7 +443,7 @@ export default function AIChat() {
               className="flex-1"
             />
             <Button
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               disabled={!inputMessage.trim() || isLoading}
               size="icon"
             >
