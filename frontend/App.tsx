@@ -15,6 +15,7 @@ import History from './components/History';
 import Payments from './components/Payments';
 import Settings from './components/Settings';
 import SMS from './components/SMS';
+import AIChat from './components/AIChat';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history'>('menu');
@@ -98,6 +99,7 @@ export default function App() {
     return (
       <>
         <MainMenu onNavigate={setCurrentView} />
+        <AIChat />
         <Toaster />
       </>
     );
@@ -107,6 +109,7 @@ export default function App() {
     return (
       <>
         <EventList onBackToForm={() => setCurrentView('form')} />
+        <AIChat />
         <Toaster />
       </>
     );
@@ -116,6 +119,7 @@ export default function App() {
     return (
       <>
         <ClientList onNavigate={setCurrentView} />
+        <AIChat />
         <Toaster />
       </>
     );
@@ -125,6 +129,7 @@ export default function App() {
     return (
       <>
         <Calendar onNavigate={setCurrentView} />
+        <AIChat />
         <Toaster />
       </>
     );
@@ -134,6 +139,7 @@ export default function App() {
     return (
       <>
         <History onNavigate={setCurrentView} />
+        <AIChat />
         <Toaster />
       </>
     );
@@ -143,6 +149,7 @@ export default function App() {
     return (
       <>
         <Payments onNavigate={setCurrentView} />
+        <AIChat />
         <Toaster />
       </>
     );
@@ -152,6 +159,7 @@ export default function App() {
     return (
       <>
         <Settings onNavigate={setCurrentView} />
+        <AIChat />
         <Toaster />
       </>
     );
@@ -161,6 +169,7 @@ export default function App() {
     return (
       <>
         <SMS onNavigate={setCurrentView} />
+        <AIChat />
         <Toaster />
       </>
     );
@@ -346,6 +355,7 @@ export default function App() {
         </form>
       </div>
     </div>
+    <AIChat />
     <Toaster />
     </>
     );
@@ -360,6 +370,7 @@ export default function App() {
           <Button onClick={() => setCurrentView('menu')}>← Wróć do menu</Button>
         </div>
       </div>
+      <AIChat />
       <Toaster />
     </>
   );
