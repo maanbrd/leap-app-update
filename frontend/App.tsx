@@ -88,9 +88,8 @@ export default function App() {
         createdBy: user?.name || 'Admin'
       });
 
-      setTimeout(() => {
-        setCurrentView('list');
-      }, 1500);
+      // 🔧 NAPRAWA: Przekieruj do listy wizyt po pomyślnym utworzeniu
+      setCurrentView('list');
     } catch (error) {
       console.error('Error creating event:', error);
       toast({
