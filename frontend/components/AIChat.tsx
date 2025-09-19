@@ -27,11 +27,22 @@ export default function AIChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
-  const [userId] = useState('current_user'); // TODO: Pobierz z kontekstu autoryzacji
+  const [userId, setUserId] = useState<string>('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Initialize userId from localStorage
+  useEffect(() => {
+    // Pobierz userId z localStorage lub wygeneruj nowy
+    let storedUserId = localStorage.getItem('leap_user_id');
+    if (!storedUserId) {
+      storedUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('leap_user_id', storedUserId);
+    }
+    setUserId(storedUserId);
+  }, []);
 
   // Przewiń do ostatniej wiadomości
   const scrollToBottom = () => {
@@ -49,12 +60,12 @@ export default function AIChat() {
     }
   }, [isOpen, sessionId]);
 
-  // Załaduj sugestie przy otwarciu
+  // Załaduj sugestie przy otwarciu (tylko gdy userId jest dostępny)
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
+    if (isOpen && messages.length === 0 && userId) {
       loadSuggestions();
     }
-  }, [isOpen]);
+  }, [isOpen, userId]);
 
   const loadSuggestions = async () => {
     try {
@@ -221,7 +232,7 @@ export default function AIChat() {
 
   const sendMessage = async (messageText?: string) => {
     const textToSend = messageText || inputMessage;
-    if (!textToSend.trim() || isLoading) return;
+    if (!textToSend.trim() || isLoading || !userId) return;
 
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}_user`,
@@ -368,7 +379,7 @@ export default function AIChat() {
       
       <CardContent className="flex-1 flex flex-col p-0">
         {/* Przyciski szybkich akcji */}
-        {messages.length === 0 && (
+        {messages.length === 0 && userId && (
           <div className="p-4 border-b">
             <QuickActionButtons />
           </div>
@@ -376,7 +387,12 @@ export default function AIChat() {
         
         {/* Obszar wiadomości */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.length === 0 && (
+          {!userId ? (
+            <div className="text-center text-muted-foreground text-sm space-y-2">
+              <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+              <p>Inicjalizuję sesję użytkownika...</p>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="text-center text-muted-foreground text-sm space-y-2">
               <p>Witaj! Jestem AI asystentem studia tatuażu.</p>
               <p>Wybierz jedną z szybkich akcji lub napisz do mnie!</p>
@@ -395,7 +411,7 @@ export default function AIChat() {
                 </div>
               )}
             </div>
-          )}
+          ) : null}
           
           {messages.map((message) => (
             <div
@@ -438,13 +454,13 @@ export default function AIChat() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Napisz wiadomość..."
-              disabled={isLoading}
+              placeholder={!userId ? "Inicjalizuję..." : "Napisz wiadomość..."}
+              disabled={isLoading || !userId}
               className="flex-1"
             />
             <Button
               onClick={() => sendMessage()}
-              disabled={!inputMessage.trim() || isLoading}
+              disabled={!inputMessage.trim() || isLoading || !userId}
               size="icon"
             >
               <Send className="h-4 w-4" />

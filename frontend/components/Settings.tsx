@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Settings as SettingsIcon, Bell, Building } from 'lucide-react';
+import { Settings as SettingsIcon, Bell, Building, User } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '../hooks/useAuth';
 
 interface SettingsProps {
   onNavigate: (view: 'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history') => void;
@@ -13,13 +14,27 @@ interface SettingsProps {
 
 export default function Settings({ onNavigate }: SettingsProps) {
   const { toast } = useToast();
+  const { user, updateUser } = useAuth();
   const [businessName, setBusinessName] = useState('Studio Tatuażu');
   const [notifications, setNotifications] = useState(true);
   const [smsReminders, setSmsReminders] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
+  const [userName, setUserName] = useState(user?.name || '');
+
+  // Update userName when user data changes
+  useEffect(() => {
+    if (user?.name) {
+      setUserName(user.name);
+    }
+  }, [user]);
 
   const handleSave = () => {
-    // Simulate saving settings
+    // Save user data
+    if (user && userName !== user.name) {
+      updateUser({ name: userName });
+    }
+    
+    // Simulate saving other settings
     toast({
       title: "Ustawienia zapisane",
       description: "Wszystkie zmiany zostały pomyślnie zapisane."
@@ -41,6 +56,46 @@ export default function Settings({ onNavigate }: SettingsProps) {
 
         <div className="space-y-6">
           
+          {/* User Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Dane użytkownika
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="userName">Nazwa użytkownika</Label>
+                <Input
+                  id="userName"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="Wpisz swoją nazwę"
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Ta nazwa będzie widoczna przy tworzonych wydarzeniach
+                </p>
+              </div>
+              {user && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>ID użytkownika</Label>
+                    <div className="text-sm font-mono bg-muted p-2 rounded">
+                      {user.id}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Rola</Label>
+                    <div className="text-sm bg-muted p-2 rounded">
+                      {user.role === 'manager' ? 'Manager' : 'Użytkownik'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Business Settings */}
           <Card>
             <CardHeader>

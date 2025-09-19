@@ -157,12 +157,46 @@ function testSMSTemplate() {
 
 const utilityTestResult = testSMSTemplate();
 
+console.log('');
+
+// User Session Test
+function testUserSessionSimulated() {
+  console.log('Testing user session simulation...');
+  
+  // Mock localStorage
+  const mockStorage = { data: {} };
+  
+  function generateUserId() {
+    let userId = mockStorage.data['leap_user_id'];
+    if (!userId) {
+      userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      mockStorage.data['leap_user_id'] = userId;
+    }
+    return userId;
+  }
+  
+  const userId1 = generateUserId();
+  const userId2 = generateUserId();
+  
+  if (userId1 === userId2 && userId1.startsWith('user_')) {
+    console.log('✅ User session simulation test passed');
+    console.log(`   Generated ID: ${userId1}`);
+    return true;
+  } else {
+    console.log('❌ User session simulation test failed');
+    return false;
+  }
+}
+
+const sessionTestResult = testUserSessionSimulated();
+
 console.log('\n' + '='.repeat(50));
 console.log('📊 FINAL RESULTS:');
 console.log(`Main Tests: ${mainTestResult ? '✅ PASSED' : '❌ FAILED'}`);
 console.log(`Utility Tests: ${utilityTestResult ? '✅ PASSED' : '❌ FAILED'}`);
+console.log(`Session Tests: ${sessionTestResult ? '✅ PASSED' : '❌ FAILED'}`);
 
-const overallSuccess = mainTestResult && utilityTestResult;
+const overallSuccess = mainTestResult && utilityTestResult && sessionTestResult;
 console.log(`\nOverall: ${overallSuccess ? '🎉 ALL TESTS PASSED!' : '❌ SOME TESTS FAILED!'}`);
 
 if (!overallSuccess) {

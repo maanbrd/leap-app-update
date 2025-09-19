@@ -16,10 +16,12 @@ import Payments from './components/Payments';
 import Settings from './components/Settings';
 import SMS from './components/SMS';
 import AIChat from './components/AIChat';
+import { useAuth } from './hooks/useAuth';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history'>('menu');
   const { toast } = useToast();
+  const { user, loading: userLoading } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -59,7 +61,7 @@ export default function App() {
         depositStatus: formData.depositStatus,
         durationMinutes: parseInt(formData.durationMinutes),
         notes: formData.notes || undefined,
-        createdBy: formData.createdBy
+        createdBy: user?.name || formData.createdBy
       });
 
       toast({
@@ -83,7 +85,7 @@ export default function App() {
         depositStatus: 'nie dotyczy',
         durationMinutes: '',
         notes: '',
-        createdBy: 'Admin'
+        createdBy: user?.name || 'Admin'
       });
     } catch (error) {
       console.error('Error creating event:', error);
