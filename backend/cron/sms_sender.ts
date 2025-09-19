@@ -34,13 +34,16 @@ export async function sendIdempotentSMS(request: SMSRequest): Promise<SMSResult>
     const body = generateSMSBody(templateCode, variables);
 
     // Check for existing SMS (idempotency)
-    const scheduledForKey = scheduledFor?.toISOString() || null;
-    
+    // We check for both scheduled and sent messages to ensure idempotency
     const existing = await db.queryRow<{ id: string; status: string }>`
       SELECT id, status FROM sms_history 
       WHERE phone = ${cleanPhone} 
         AND template_code = ${templateCode}
-        AND COALESCE(scheduled_for::text, sent_at::text) = ${scheduledForKey}
+        AND (
+          (scheduled_for IS NOT NULL AND scheduled_for::date = ${scheduledFor ? scheduledFor.toISOString().split('T')[0] : null}::date)
+          OR 
+          (sent_at IS NOT NULL AND sent_at::date = ${scheduledFor ? scheduledFor.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}::date)
+        )
     `;
 
     if (existing) {

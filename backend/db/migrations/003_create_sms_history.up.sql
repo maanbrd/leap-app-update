@@ -45,6 +45,13 @@ BEGIN
   ALTER TABLE sms_history_new RENAME TO sms_history;
 END $$;
 
--- Create unique index for idempotency (PostgreSQL compatible)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_sms_unique
-  ON sms_history(phone, template_code, COALESCE(scheduled_for::text, sent_at::text));
+-- Create indexes for idempotency checking
+-- We'll use application logic instead of a complex unique constraint
+CREATE INDEX IF NOT EXISTS idx_sms_phone_template 
+  ON sms_history(phone, template_code);
+
+CREATE INDEX IF NOT EXISTS idx_sms_scheduled_for 
+  ON sms_history(scheduled_for) WHERE scheduled_for IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_sms_sent_at 
+  ON sms_history(sent_at) WHERE sent_at IS NOT NULL;
