@@ -255,6 +255,7 @@ export namespace ai {
  */
 import { create as api_client_create_create } from "~backend/client/create";
 import { list as api_client_list_list } from "~backend/client/list";
+import { update as api_client_update_update } from "~backend/client/update";
 
 export namespace client {
 
@@ -265,6 +266,7 @@ export namespace client {
             this.baseClient = baseClient
             this.create = this.create.bind(this)
             this.list = this.list.bind(this)
+            this.update = this.update.bind(this)
         }
 
         /**
@@ -283,6 +285,25 @@ export namespace client {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/clients`, {method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_client_list_list>
+        }
+
+        /**
+         * Updates an existing client
+         */
+        public async update(params: RequestType<typeof api_client_update_update>): Promise<ResponseType<typeof api_client_update_update>> {
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                email:     params.email,
+                firstName: params.firstName,
+                instagram: params.instagram,
+                lastName:  params.lastName,
+                messenger: params.messenger,
+                phone:     params.phone,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/clients/${encodeURIComponent(params.id)}`, {method: "PUT", body: JSON.stringify(body)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_client_update_update>
         }
     }
 }
@@ -410,6 +431,7 @@ export namespace debug {
  */
 import { create as api_event_create_create } from "~backend/event/create";
 import { list as api_event_list_list } from "~backend/event/list";
+import { update as api_event_update_update } from "~backend/event/update";
 
 export namespace event {
 
@@ -420,6 +442,7 @@ export namespace event {
             this.baseClient = baseClient
             this.create = this.create.bind(this)
             this.list = this.list.bind(this)
+            this.update = this.update.bind(this)
         }
 
         /**
@@ -438,6 +461,22 @@ export namespace event {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/events`, {method: "GET", body: undefined})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_event_list_list>
+        }
+
+        /**
+         * Updates an existing event
+         */
+        public async update(params: RequestType<typeof api_event_update_update>): Promise<ResponseType<typeof api_event_update_update>> {
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                depositAmount: params.depositAmount,
+                depositStatus: params.depositStatus,
+                price:         params.price,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/events/${encodeURIComponent(params.id)}`, {method: "PUT", body: JSON.stringify(body)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_event_update_update>
         }
     }
 }
