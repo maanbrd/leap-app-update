@@ -8,9 +8,9 @@ CREATE TABLE IF NOT EXISTS sms_history (
   status TEXT NOT NULL CHECK (status IN ('queued', 'sent', 'failed')),
   provider_id TEXT,
   error_message TEXT,
-  scheduled_for DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  sent_at DATETIME,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  scheduled_for TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sent_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create unique index for idempotency (SQLite compatible)
