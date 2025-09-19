@@ -183,6 +183,31 @@ export const create = api<CreateEventRequest, CreateEventResponse>(
       // Commit the transaction
       await tx.commit();
       
+      // Log successful creation
+      logger.info('Event created successfully', {
+        eventId: event.id,
+        clientName: `${req.firstName} ${req.lastName}`,
+        eventTime: req.eventTime,
+        service: req.service
+      });
+      
+      // Verify data was saved
+      const verifyEvent = await db.queryRow<Event>`
+        SELECT id, first_name, last_name, event_time, service, created_at
+        FROM events 
+        WHERE id = ${event.id}
+      `;
+      
+      if (!verifyEvent) {
+        logger.error('Event not found after creation', { eventId: event.id });
+        throw APIError.internal('Błąd weryfikacji - wydarzenie nie zostało zapisane');
+      }
+      
+      logger.info('Event verification successful', { 
+        eventId: verifyEvent.id,
+        createdAt: verifyEvent.createdAt 
+      });
+      
       return { event };
     } catch (error) {
       // Rollback the transaction on error
