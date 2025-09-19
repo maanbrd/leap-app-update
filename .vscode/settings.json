@@ -1,0 +1,21 @@
+{
+  "files.watcherExclude": {
+    "**/node_modules/**": false
+  },
+  "search.exclude": {
+    "**/node_modules": false,
+    "**/dist": true,
+    "**/.git": true
+  },
+  "cursor.cpp.enableIntelliSense": true,
+  "cursor.general.enableAutoImport": true,
+  "files.associations": {
+    "*.ts": "typescript",
+    "*.tsx": "typescriptreact"
+  },
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.autoImports": true,
+  "editor.codeActionsOnSave": {
+    "source.addMissingImports": "explicit"
+  }
+}

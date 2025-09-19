@@ -1,0 +1,41 @@
+# Cursor AI Rules for Leap App
+# Automatyczny podgląd kodu dla projektu Encore.ts + React
+
+## Struktura projektu
+- backend/ - kod Encore.ts (TypeScript backend)
+- frontend/ - kod React + TypeScript
+- Używamy Encore.ts dla API, React + Tailwind dla UI
+
+## Automatyczne zczytywanie kontekstu
+Zawsze uwzględniaj w kontekście:
+- backend/encore.app
+- backend/package.json
+- frontend/package.json
+- backend/db/migrations/
+- wszystkie pliki .ts/.tsx w backend/ i frontend/
+
+## Wzorce kodowania
+- Backend: Encore.ts API patterns
+- Frontend: React hooks, Tailwind CSS, shadcn/ui
+- Import backend API: `import backend from '~backend/client'`
+- Types: `import type { ... } from ~backend/...`
+
+## Foldery do monitorowania
+@workspace zawsze skanuje:
+- /backend/**/*.ts
+- /frontend/**/*.tsx
+- /backend/db/migrations/*.sql
+- /*.json
+- /*.md
+
+## Automatyczne akcje
+- Przed każdą odpowiedzią przeskanuj workspace
+- Uwzględnij zmiany w package.json
+- Sprawdź migracje bazy danych
+- Monitoruj pliki konfiguracyjne
+
+## Preferencje
+- Używaj 2 spacji do wcięć
+- TypeScript strict mode
+- Encore.ts best practices
+- React functional components
