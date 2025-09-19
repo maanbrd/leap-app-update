@@ -83,11 +83,7 @@ export const preview = api(
           SELECT id, status FROM sms_history 
           WHERE phone = ${phone} 
             AND template_code = ${templateCode}
-            AND (
-              (scheduled_for IS NOT NULL AND scheduled_for::date = ${scheduledFor.toISOString().split('T')[0]}::date)
-              OR 
-              (sent_at IS NOT NULL AND sent_at::date = ${scheduledFor.toISOString().split('T')[0]}::date)
-            )
+            AND scheduled_for = ${scheduledFor.toISOString()}
         `;
 
         if (existing) {

@@ -33,17 +33,15 @@ export async function sendIdempotentSMS(request: SMSRequest): Promise<SMSResult>
     // Generate SMS body using template and variables
     const body = generateSMSBody(templateCode, variables);
 
-    // Check for existing SMS (idempotency)
-    // We check for both scheduled and sent messages to ensure idempotency
+    // Set scheduled_for to a specific datetime (required for unique constraint)
+    const scheduledForKey = scheduledFor || new Date();
+    
+    // Check for existing SMS (idempotency) - check for sent messages first
     const existing = await db.queryRow<{ id: string; status: string }>`
       SELECT id, status FROM sms_history 
       WHERE phone = ${cleanPhone} 
         AND template_code = ${templateCode}
-        AND (
-          (scheduled_for IS NOT NULL AND scheduled_for::date = ${scheduledFor ? scheduledFor.toISOString().split('T')[0] : null}::date)
-          OR 
-          (sent_at IS NOT NULL AND sent_at::date = ${scheduledFor ? scheduledFor.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}::date)
-        )
+        AND scheduled_for = ${scheduledForKey.toISOString()}
     `;
 
     if (existing) {
@@ -57,15 +55,23 @@ export async function sendIdempotentSMS(request: SMSRequest): Promise<SMSResult>
     // Create SMS history record with queued status
     const smsId = `sms_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    await db.exec`
-      INSERT INTO sms_history (
-        id, client_id, phone, body, template_code, status, 
-        scheduled_for, created_at
-      ) VALUES (
-        ${smsId}, ${clientId}, ${cleanPhone}, ${body}, ${templateCode}, 
-        'queued', ${scheduledFor}, NOW()
-      )
-    `;
+    try {
+      await db.exec`
+        INSERT INTO sms_history (
+          id, client_id, phone, body, template_code, status, 
+          scheduled_for, created_at
+        ) VALUES (
+          ${smsId}, ${clientId}, ${cleanPhone}, ${body}, ${templateCode}, 
+          'queued', ${scheduledForKey.toISOString()}, CURRENT_TIMESTAMP
+        )
+      `;
+    } catch (dbError) {
+      // If unique constraint violation, another process already queued this SMS
+      if (dbError instanceof Error && dbError.message.includes('UNIQUE constraint failed')) {
+        return { success: false, alreadySent: true, error: 'SMS already queued by another process' };
+      }
+      throw dbError;
+    }
 
     // Send SMS via SMSAPI
     const sendResult = await sendViaSMSAPI(cleanPhone, body);
@@ -74,7 +80,7 @@ export async function sendIdempotentSMS(request: SMSRequest): Promise<SMSResult>
       // Update record as sent
       await db.exec`
         UPDATE sms_history 
-        SET status = 'sent', provider_id = ${sendResult.messageId}, sent_at = NOW()
+        SET status = 'sent', provider_id = ${sendResult.messageId}, sent_at = CURRENT_TIMESTAMP
         WHERE id = ${smsId}
       `;
 
@@ -222,8 +228,8 @@ export async function logCronRun(
       INSERT INTO cron_runs (
         id, job_name, planned_at, started_at, finished_at, ok, details
       ) VALUES (
-        ${runId}, ${jobName}, ${plannedAt}, 
-        NOW(), NOW(), ${success ? 1 : 0}, ${details}
+        ${runId}, ${jobName}, ${plannedAt.toISOString()}, 
+        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ${success ? 1 : 0}, ${details}
       )
     `;
   } catch (error) {
