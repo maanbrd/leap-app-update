@@ -83,7 +83,7 @@ export const preview = api(
           SELECT id, status FROM sms_history 
           WHERE phone = ${phone} 
             AND template_code = ${templateCode}
-            AND COALESCE(scheduled_for, sent_at) = ${scheduledFor.toISOString()}
+            AND COALESCE(scheduled_for::text, sent_at::text) = ${scheduledFor.toISOString()}
         `;
 
         if (existing) {

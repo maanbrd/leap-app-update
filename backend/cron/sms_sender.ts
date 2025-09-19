@@ -40,7 +40,7 @@ export async function sendIdempotentSMS(request: SMSRequest): Promise<SMSResult>
       SELECT id, status FROM sms_history 
       WHERE phone = ${cleanPhone} 
         AND template_code = ${templateCode}
-        AND COALESCE(scheduled_for, sent_at) = ${scheduledForKey}
+        AND COALESCE(scheduled_for::text, sent_at::text) = ${scheduledForKey}
     `;
 
     if (existing) {
@@ -60,7 +60,7 @@ export async function sendIdempotentSMS(request: SMSRequest): Promise<SMSResult>
         scheduled_for, created_at
       ) VALUES (
         ${smsId}, ${clientId}, ${cleanPhone}, ${body}, ${templateCode}, 
-        'queued', ${scheduledForKey}, CURRENT_TIMESTAMP
+        'queued', ${scheduledFor}, NOW()
       )
     `;
 
@@ -71,7 +71,7 @@ export async function sendIdempotentSMS(request: SMSRequest): Promise<SMSResult>
       // Update record as sent
       await db.exec`
         UPDATE sms_history 
-        SET status = 'sent', provider_id = ${sendResult.messageId}, sent_at = CURRENT_TIMESTAMP
+        SET status = 'sent', provider_id = ${sendResult.messageId}, sent_at = NOW()
         WHERE id = ${smsId}
       `;
 
@@ -219,8 +219,8 @@ export async function logCronRun(
       INSERT INTO cron_runs (
         id, job_name, planned_at, started_at, finished_at, ok, details
       ) VALUES (
-        ${runId}, ${jobName}, ${plannedAt.toISOString()}, 
-        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ${success ? 1 : 0}, ${details}
+        ${runId}, ${jobName}, ${plannedAt}, 
+        NOW(), NOW(), ${success ? 1 : 0}, ${details}
       )
     `;
   } catch (error) {
