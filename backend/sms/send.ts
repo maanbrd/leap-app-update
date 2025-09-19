@@ -69,7 +69,7 @@ export const sendSMS = api(
         body: params.toString()
       });
 
-      const responseData = await response.json();
+      const responseData = await response.json() as any;
 
       if (response.ok && responseData.count > 0) {
         // Zapisz wysłany SMS do historii
