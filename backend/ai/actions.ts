@@ -39,6 +39,11 @@ export interface AnalyzeClientDataResponse {
 export interface GenerateEventSummaryRequest {
   period: 'today' | 'week' | 'month';
   userId: string;
+  role?: string;
+  filters?: {
+    from?: string;
+    to?: string;
+  };
 }
 
 export interface GenerateEventSummaryResponse {
@@ -187,23 +192,32 @@ export const generateEventSummary = api(
     }
 
     try {
-      let dateFilter = '';
       const now = new Date();
+      let fromDate: string | null = null;
+      let toDate: string | null = null;
       
+      // Calculate date range based on period
       switch (req.period) {
         case 'today':
           const today = now.toISOString().split('T')[0];
-          dateFilter = `AND DATE(event_time) = '${today}'`;
+          fromDate = `${today}T00:00:00.000Z`;
+          toDate = `${today}T23:59:59.999Z`;
           break;
         case 'week':
           const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          dateFilter = `AND event_time >= '${weekAgo.toISOString()}'`;
+          fromDate = weekAgo.toISOString();
           break;
         case 'month':
           const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          dateFilter = `AND event_time >= '${monthAgo.toISOString()}'`;
+          fromDate = monthAgo.toISOString();
           break;
       }
+
+      // Use filters if provided, otherwise use period-based dates
+      const { from, to } = req.filters ?? {};
+      const finalFromDate = from ?? fromDate;
+      const finalToDate = to ?? toDate;
+      const isManager = req.role === 'manager';
 
       const events = await db.queryAll<{
         service: string;
@@ -214,8 +228,11 @@ export const generateEventSummary = api(
       }>`
         SELECT service, price, event_time, deposit_status, duration_minutes
         FROM events
-        WHERE (created_by = ${req.userId} OR ${req.userId} = 'manager')
-        ${dateFilter}
+        WHERE (
+          ${isManager} OR created_by = ${req.userId}
+        )
+          AND ( ${finalFromDate} IS NULL OR event_time >= ${finalFromDate} )
+          AND ( ${finalToDate} IS NULL OR event_time <= ${finalToDate} )
         ORDER BY event_time DESC
       `;
 
