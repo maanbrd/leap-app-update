@@ -2,9 +2,9 @@
 CREATE TABLE IF NOT EXISTS cron_runs (
   id TEXT PRIMARY KEY,
   job_name TEXT NOT NULL,
-  planned_at DATETIME NOT NULL,
-  started_at DATETIME,
-  finished_at DATETIME,
+  planned_at TIMESTAMP NOT NULL,
+  started_at TIMESTAMP,
+  finished_at TIMESTAMP,
   ok INTEGER NOT NULL DEFAULT 0 CHECK (ok IN (0, 1)),
   details TEXT
 );
