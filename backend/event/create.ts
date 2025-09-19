@@ -1,5 +1,6 @@
 import { api, APIError } from "encore.dev/api";
 import db from "../db";
+import logger from '../utils/logger';
 
 export interface CreateEventRequest {
   firstName: string;
@@ -155,7 +156,11 @@ export const create = api<CreateEventRequest, CreateEventResponse>(
       await tx.rollback();
       
       // Log error for debugging
-      console.error('Error creating event:', error);
+      logger.error('Error creating event', { 
+        error: error instanceof Error ? error.message : String(error), 
+        stack: error instanceof Error ? error.stack : undefined,
+        requestData: { firstName: req.firstName, lastName: req.lastName }
+      });
       
       // Return structured error response
       if (error instanceof APIError) {
