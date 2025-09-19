@@ -1,4 +1,4 @@
-import { api } from "encore.dev/api";
+import { api, APIError } from "encore.dev/api";
 import db from "../db";
 
 export interface CreateEventRequest {
@@ -49,6 +49,45 @@ export interface CreateEventResponse {
 export const create = api<CreateEventRequest, CreateEventResponse>(
   { method: "POST", path: "/events", expose: true },
   async (req): Promise<CreateEventResponse> => {
+    // Walidacja danych wejściowych
+    if (!req.firstName?.trim()) {
+      throw APIError.invalidArgument("Imię jest wymagane");
+    }
+    if (!req.lastName?.trim()) {
+      throw APIError.invalidArgument("Nazwisko jest wymagane");
+    }
+    if (!req.eventTime) {
+      throw APIError.invalidArgument("Data wizyty jest wymagana");
+    }
+    if (!req.service?.trim()) {
+      throw APIError.invalidArgument("Usługa jest wymagana");
+    }
+    if (req.price <= 0) {
+      throw APIError.invalidArgument("Cena musi być większa od 0");
+    }
+    if (req.durationMinutes <= 0) {
+      throw APIError.invalidArgument("Czas trwania musi być większy od 0");
+    }
+
+    // Walidacja daty
+    const eventDate = new Date(req.eventTime);
+    if (isNaN(eventDate.getTime())) {
+      throw APIError.invalidArgument("Nieprawidłowy format daty");
+    }
+    if (eventDate < new Date()) {
+      throw APIError.invalidArgument("Data wizyty nie może być w przeszłości");
+    }
+
+    // Walidacja numeru telefonu (jeśli podany)
+    if (req.phone && !/^(\+48|48)?[0-9]{9}$/.test(req.phone.replace(/[\s-]/g, ''))) {
+      throw APIError.invalidArgument("Nieprawidłowy format numeru telefonu");
+    }
+
+    // Walidacja email (jeśli podany)
+    if (req.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.email)) {
+      throw APIError.invalidArgument("Nieprawidłowy format email");
+    }
+
     // Start a transaction to ensure both event and client are created together
     const tx = await db.begin();
     
@@ -114,7 +153,16 @@ export const create = api<CreateEventRequest, CreateEventResponse>(
     } catch (error) {
       // Rollback the transaction on error
       await tx.rollback();
-      throw error;
+      
+      // Log error for debugging
+      console.error('Error creating event:', error);
+      
+      // Return structured error response
+      if (error instanceof APIError) {
+        throw error;
+      }
+      
+      throw APIError.internal(`Błąd podczas tworzenia wizyty: ${error instanceof Error ? error.message : 'Nieznany błąd'}`);
     }
   }
 );

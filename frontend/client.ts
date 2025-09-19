@@ -36,6 +36,7 @@ export class Client {
     public readonly ai: ai.ServiceClient
     public readonly client: client.ServiceClient
     public readonly cron: cron.ServiceClient
+    public readonly debug: debug.ServiceClient
     public readonly event: event.ServiceClient
     public readonly sms: sms.ServiceClient
     private readonly options: ClientOptions
@@ -55,6 +56,7 @@ export class Client {
         this.ai = new ai.ServiceClient(base)
         this.client = new client.ServiceClient(base)
         this.cron = new cron.ServiceClient(base)
+        this.debug = new debug.ServiceClient(base)
         this.event = new event.ServiceClient(base)
         this.sms = new sms.ServiceClient(base)
     }
@@ -382,6 +384,23 @@ export namespace cron {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/cron/trigger`, {method: "POST", body: JSON.stringify(params)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_cron_scheduler_triggerJob>
+        }
+    }
+}
+
+
+export namespace debug {
+
+    export class ServiceClient {
+        private baseClient: BaseClient
+
+        constructor(baseClient: BaseClient) {
+            this.baseClient = baseClient
+            this.checkData = this.checkData.bind(this)
+        }
+
+        public async checkData(): Promise<void> {
+            await this.baseClient.callTypedAPI(`/debug/check-data`, {method: "GET", body: undefined})
         }
     }
 }
