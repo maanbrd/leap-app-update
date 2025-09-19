@@ -89,6 +89,28 @@ export const create = api<CreateEventRequest, CreateEventResponse>(
       throw APIError.invalidArgument("Nieprawidłowy format email");
     }
 
+    // Walidacja i formatowanie dat
+    const eventTime = new Date(req.eventTime);
+    if (isNaN(eventTime.getTime())) {
+      throw APIError.invalidArgument("Nieprawidłowy format daty wizyty");
+    }
+    
+    const birthDate = req.birthDate ? new Date(req.birthDate) : null;
+    if (req.birthDate && birthDate && isNaN(birthDate.getTime())) {
+      throw APIError.invalidArgument("Nieprawidłowy format daty urodzenia");
+    }
+    
+    const depositDueDate = req.depositDueDate ? new Date(req.depositDueDate) : null;
+    if (req.depositDueDate && depositDueDate && isNaN(depositDueDate.getTime())) {
+      throw APIError.invalidArgument("Nieprawidłowy format daty zadatku");
+    }
+    
+    // Walidacja depositAmount
+    const depositAmount = req.depositAmount ? parseFloat(req.depositAmount.toString()) : null;
+    if (req.depositAmount && depositAmount !== null && (isNaN(depositAmount) || depositAmount < 0)) {
+      throw APIError.invalidArgument("Nieprawidłowa kwota zadatku");
+    }
+
     // Start a transaction to ensure both event and client are created together
     const tx = await db.begin();
     
@@ -109,7 +131,7 @@ export const create = api<CreateEventRequest, CreateEventResponse>(
         `;
       }
 
-      // Create the event
+      // Create the event with proper date formatting
       const event = await tx.queryRow<Event>`
         INSERT INTO events (
           first_name, last_name, birth_date, phone, instagram, messenger, email,
@@ -117,10 +139,21 @@ export const create = api<CreateEventRequest, CreateEventResponse>(
           duration_minutes, notes, created_by
         )
         VALUES (
-          ${req.firstName}, ${req.lastName}, ${req.birthDate}, ${req.phone}, 
-          ${req.instagram}, ${req.messenger}, ${req.email}, ${req.eventTime},
-          ${req.service}, ${req.price}, ${req.depositAmount}, ${req.depositDueDate},
-          ${req.depositStatus}, ${req.durationMinutes}, ${req.notes}, ${req.createdBy}
+          ${req.firstName}, ${req.lastName}, 
+          ${req.birthDate ? new Date(req.birthDate) : null}, 
+          ${req.phone || null}, 
+          ${req.instagram || null}, 
+          ${req.messenger || null}, 
+          ${req.email || null}, 
+          ${new Date(req.eventTime)},
+          ${req.service}, 
+          ${req.price}, 
+          ${req.depositAmount ? parseFloat(req.depositAmount.toString()) : null}, 
+          ${req.depositDueDate ? new Date(req.depositDueDate) : null},
+          ${req.depositStatus}, 
+          ${req.durationMinutes}, 
+          ${req.notes || null}, 
+          ${req.createdBy}
         )
         RETURNING 
           id,
