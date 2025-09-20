@@ -15,25 +15,21 @@ interface ClientDetailModalProps {
   client: Client | null;
   isOpen: boolean;
   onClose: () => void;
+  onClientUpdate?: (updatedClient: Client) => void;
 }
 
-export default function ClientDetailModal({ client, isOpen, onClose }: ClientDetailModalProps) {
+export default function ClientDetailModal({ client, isOpen, onClose, onClientUpdate }: ClientDetailModalProps) {
   const [clientData, setClientData] = useState<Client | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [smsHistory, setSmsHistory] = useState<SMSHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
-  // Client editing states
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [editStatus, setEditStatus] = useState<string>('');
-
-  // Event editing states
   const [editingEvent, setEditingEvent] = useState<number | null>(null);
   const [editingEventField, setEditingEventField] = useState<string | null>(null);
   const [eventEditValue, setEventEditValue] = useState('');
-  const [eventLoading, setEventLoading] = useState(false);
 
   useEffect(() => {
     if (client && isOpen) {
@@ -47,18 +43,18 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
     
     setLoading(true);
     try {
-      // Fetch events
       const eventsResponse = await backend.event.list();
-      const clientEvents = eventsResponse.events.filter(event => 
-        event.clientId === client.id
-      ).slice(0, 10);
+      const clientEvents = eventsResponse.events
+        .filter(event => event.clientId === client.id)
+        .sort((a, b) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime())
+        .slice(0, 10);
       setEvents(clientEvents);
 
-      // Fetch SMS history
       const smsResponse = await backend.sms.getSMSHistory();
-      const clientSms = smsResponse.history.filter(sms => 
-        sms.clientId === client.id
-      ).slice(0, 10);
+      const clientSms = smsResponse.history
+        .filter(sms => sms.clientId === client.id)
+        .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())
+        .slice(0, 10);
       setSmsHistory(clientSms);
     } catch (error) {
       console.error('Error fetching client history:', error);
@@ -75,13 +71,11 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
   const startEditing = (field: string, currentValue: string) => {
     setEditingField(field);
     setEditValue(currentValue || '');
-    setEditStatus('');
   };
 
   const cancelEditing = () => {
     setEditingField(null);
     setEditValue('');
-    setEditStatus('');
   };
 
   const saveField = async () => {
@@ -94,7 +88,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
       switch (editingField) {
         case 'phone':
           if (editValue && !/^(\+48|48)?[0-9]{9}$/.test(editValue.replace(/[\s-]/g, ''))) {
-            setEditStatus('error');
             toast({
               title: "Błąd walidacji",
               description: "Nieprawidłowy format numeru telefonu",
@@ -106,7 +99,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
           break;
         case 'email':
           if (editValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editValue)) {
-            setEditStatus('error');
             toast({
               title: "Błąd walidacji",
               description: "Nieprawidłowy format adresu email",
@@ -118,7 +110,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
           break;
         case 'instagram':
           if (editValue && !/^[a-zA-Z0-9._]+$/.test(editValue)) {
-            setEditStatus('error');
             toast({
               title: "Błąd walidacji",
               description: "Instagram może zawierać tylko litery, cyfry, kropki i podkreślenia",
@@ -133,15 +124,10 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
           break;
       }
 
-      const response = await backend.client.update(updateData);
+      const response = await backend.update(updateData);
       
-      // Convert Date to string to match Client interface
-      const updatedClient = {
-        ...response.client,
-        birthDate: response.client.birthDate?.toISOString().split('T')[0]
-      };
-      setClientData(updatedClient);
-      setEditStatus('success');
+      setClientData(response.client);
+      onClientUpdate?.(response.client);
       
       toast({
         title: "Sukces",
@@ -154,7 +140,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
 
     } catch (error) {
       console.error('Error updating client:', error);
-      setEditStatus('error');
       toast({
         title: "Błąd",
         description: "Nie udało się zaktualizować danych klienta",
@@ -180,7 +165,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
   const saveEventField = async () => {
     if (!editingEvent || !editingEventField) return;
 
-    setEventLoading(true);
     try {
       const updateData: any = { id: editingEvent };
       
@@ -255,8 +239,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
         description: "Nie udało się zaktualizować danych wizyty",
         variant: "destructive",
       });
-    } finally {
-      setEventLoading(false);
     }
   };
 
@@ -293,7 +275,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
             <div className="space-y-6">
-              
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -312,7 +293,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             placeholder="Numer telefonu"
-                            className={editStatus === 'error' ? 'border-red-500' : ''}
                           />
                           <Button size="sm" onClick={saveField} disabled={saving}>
                             <Save className="h-3 w-3" />
@@ -341,7 +321,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             placeholder="Adres email"
-                            className={editStatus === 'error' ? 'border-red-500' : ''}
                           />
                           <Button size="sm" onClick={saveField} disabled={saving}>
                             <Save className="h-3 w-3" />
@@ -370,7 +349,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             placeholder="Instagram"
-                            className={editStatus === 'error' ? 'border-red-500' : ''}
                           />
                           <Button size="sm" onClick={saveField} disabled={saving}>
                             <Save className="h-3 w-3" />
@@ -399,7 +377,6 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             placeholder="Messenger"
-                            className={editStatus === 'error' ? 'border-red-500' : ''}
                           />
                           <Button size="sm" onClick={saveField} disabled={saving}>
                             <Save className="h-3 w-3" />
@@ -486,7 +463,7 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
                                       <SelectItem value="nie dotyczy">Nie dotyczy</SelectItem>
                                     </SelectContent>
                                   </Select>
-                                  <Button size="sm" onClick={saveEventField} disabled={eventLoading}>
+                                  <Button size="sm" onClick={saveEventField}>
                                     <Save className="h-3 w-3" />
                                   </Button>
                                   <Button size="sm" variant="outline" onClick={cancelEditingEvent}>
@@ -515,7 +492,7 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
                                     placeholder="Cena"
                                     className="w-20 h-6 text-xs"
                                   />
-                                  <Button size="sm" onClick={saveEventField} disabled={eventLoading}>
+                                  <Button size="sm" onClick={saveEventField}>
                                     <Save className="h-3 w-3" />
                                   </Button>
                                   <Button size="sm" variant="outline" onClick={cancelEditingEvent}>
@@ -541,7 +518,7 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
                                       placeholder="Zadatek"
                                       className="w-20 h-6 text-xs"
                                     />
-                                    <Button size="sm" onClick={saveEventField} disabled={eventLoading}>
+                                    <Button size="sm" onClick={saveEventField}>
                                       <Save className="h-3 w-3" />
                                     </Button>
                                     <Button size="sm" variant="outline" onClick={cancelEditingEvent}>
@@ -591,7 +568,7 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
                           <p className="text-sm text-muted-foreground mb-2">
                             {formatDate(sms.sentAt)}
                           </p>
-                          <p className="text-sm">{sms.content || sms.message}</p>
+                          <p className="text-sm">{sms.content}</p>
                         </div>
                       ))}
                     </div>
