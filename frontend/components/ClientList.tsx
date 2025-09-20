@@ -2,22 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Search, User, Phone, Mail, Instagram, MessageCircle } from 'lucide-react';
 import backend from '~backend/client';
-
-interface Client {
-  id: number;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  email?: string;
-  instagram?: string;
-  messenger?: string;
-  notes?: string;
-  status: 'nowy' | 'aktywny' | 'nieaktywny' | 'zbanowany';
-  createdAt: Date;
-}
+import type { Client } from '~backend/client';
 
 interface ClientListProps {
   onNavigate: (view: string) => void;
@@ -73,26 +60,6 @@ export default function ClientList({ onNavigate }: ClientListProps) {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'nowy': return 'bg-blue-100 text-blue-800';
-      case 'aktywny': return 'bg-green-100 text-green-800';
-      case 'nieaktywny': return 'bg-yellow-100 text-yellow-800';
-      case 'zbanowany': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'nowy': return 'Nowy';
-      case 'aktywny': return 'Aktywny';
-      case 'nieaktywny': return 'Nieaktywny';
-      case 'zbanowany': return 'Zbanowany';
-      default: return status;
-    }
-  };
-
   // Paginacja
   const startIndex = (currentPage - 1) * clientsPerPage;
   const endIndex = startIndex + clientsPerPage;
@@ -144,14 +111,9 @@ export default function ClientList({ onNavigate }: ClientListProps) {
           {paginatedClients.map((client) => (
             <Card key={client.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg">
-                    {client.firstName} {client.lastName}
-                  </CardTitle>
-                  <Badge className={getStatusColor(client.status)}>
-                    {getStatusLabel(client.status)}
-                  </Badge>
-                </div>
+                <CardTitle className="text-lg">
+                  {client.firstName} {client.lastName}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {/* Contact Info */}
