@@ -12,7 +12,6 @@ export interface Client {
   email?: string;
   createdBy: string;
   createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface ListClientsResponse {
@@ -23,6 +22,8 @@ export interface ListClientsResponse {
 export const list = api<void, ListClientsResponse>(
   { method: "GET", path: "/clients", expose: true },
   async (): Promise<ListClientsResponse> => {
+    console.log('📋 Backend: Loading clients from database...');
+    
     const clients = await db.queryAll<Client>`
       SELECT 
         id, 
@@ -34,12 +35,12 @@ export const list = api<void, ListClientsResponse>(
         messenger, 
         email, 
         created_by as "createdBy", 
-        created_at as "createdAt",
-        updated_at as "updatedAt"
+        created_at as "createdAt"
       FROM clients
       ORDER BY created_at DESC
     `;
 
+    console.log(`✅ Backend: Loaded ${clients.length} clients`);
     return { clients };
   }
 );

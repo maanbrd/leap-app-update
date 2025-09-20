@@ -432,7 +432,7 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
                     <strong>Utworzony przez:</strong> {clientData.createdBy}
                   </p>
                   <p className="text-sm">
-                    <strong>Ostatnia aktualizacja:</strong> {formatDate(clientData.updatedAt)}
+                    <strong>Data utworzenia:</strong> {formatDate(clientData.createdAt)}
                   </p>
                 </CardContent>
               </Card>

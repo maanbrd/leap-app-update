@@ -22,6 +22,8 @@ export const update = api<UpdateClientRequest, UpdateClientResponse>(
   { method: "PUT", path: "/clients/:id", expose: true },
   async (req): Promise<UpdateClientResponse> => {
     try {
+      console.log('🔄 Backend: Updating client', req.id, 'with data:', req);
+      
       // Validate ID
       if (!req.id || req.id <= 0) {
         throw APIError.invalidArgument("Nieprawidłowe ID klienta");
@@ -104,32 +106,32 @@ export const update = api<UpdateClientRequest, UpdateClientResponse>(
         // Update fields individually
         if (req.firstName !== undefined) {
           const firstName = req.firstName.trim();
-          await tx.exec`UPDATE clients SET first_name = ${firstName}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+          await tx.exec`UPDATE clients SET first_name = ${firstName} WHERE id = ${req.id}`;
         }
 
         if (req.lastName !== undefined) {
           const lastName = req.lastName.trim();
-          await tx.exec`UPDATE clients SET last_name = ${lastName}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+          await tx.exec`UPDATE clients SET last_name = ${lastName} WHERE id = ${req.id}`;
         }
 
         if (req.phone !== undefined) {
           const phone = req.phone.trim() === '' ? null : req.phone.replace(/[\s-]/g, '');
-          await tx.exec`UPDATE clients SET phone = ${phone}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+          await tx.exec`UPDATE clients SET phone = ${phone} WHERE id = ${req.id}`;
         }
 
         if (req.email !== undefined) {
           const email = req.email.trim() === '' ? null : req.email.toLowerCase().trim();
-          await tx.exec`UPDATE clients SET email = ${email}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+          await tx.exec`UPDATE clients SET email = ${email} WHERE id = ${req.id}`;
         }
 
         if (req.instagram !== undefined) {
           const instagram = req.instagram.trim() === '' ? null : req.instagram.toLowerCase().trim();
-          await tx.exec`UPDATE clients SET instagram = ${instagram}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+          await tx.exec`UPDATE clients SET instagram = ${instagram} WHERE id = ${req.id}`;
         }
 
         if (req.messenger !== undefined) {
           const messenger = req.messenger.trim() === '' ? null : req.messenger.trim();
-          await tx.exec`UPDATE clients SET messenger = ${messenger}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+          await tx.exec`UPDATE clients SET messenger = ${messenger} WHERE id = ${req.id}`;
         }
 
         // Get the updated client
@@ -144,8 +146,7 @@ export const update = api<UpdateClientRequest, UpdateClientResponse>(
             messenger, 
             email, 
             created_by as "createdBy", 
-            created_at as "createdAt",
-            updated_at as "updatedAt"
+            created_at as "createdAt"
           FROM clients
           WHERE id = ${req.id}
         `;
@@ -155,6 +156,8 @@ export const update = api<UpdateClientRequest, UpdateClientResponse>(
         }
 
         await tx.commit();
+
+        console.log('✅ Backend: Client updated successfully:', updatedClient.id);
 
         logger.info("Client updated successfully", {
           clientId: req.id,
@@ -172,6 +175,8 @@ export const update = api<UpdateClientRequest, UpdateClientResponse>(
       if (error instanceof APIError) {
         throw error;
       }
+
+      console.error('❌ Backend: Error updating client:', error);
 
       logger.error("Error updating client", {
         clientId: req.id,
