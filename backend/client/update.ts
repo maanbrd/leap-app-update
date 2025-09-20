@@ -22,7 +22,7 @@ export interface UpdateClientResponse {
     email?: string;
     instagram?: string;
     messenger?: string;
-    birthDate?: Date;
+    birthDate?: string;
     createdAt: Date;
     updatedAt: Date;
     createdBy: string;
@@ -76,7 +76,7 @@ export const update = api<UpdateClientRequest, UpdateClientResponse>(
         throw APIError.notFound("Klient nie został znaleziony");
       }
 
-      // Check for duplicates
+      // Check for duplicates (phone and email)
       if (req.phone !== undefined && req.phone) {
         const cleanPhone = req.phone.replace(/[\s-]/g, '');
         const phoneDuplicate = await db.queryRow`
@@ -97,43 +97,42 @@ export const update = api<UpdateClientRequest, UpdateClientResponse>(
         }
       }
 
-      // Build update query dynamically
-      const updates: string[] = [];
-      const hasFirstName = req.firstName !== undefined;
-      const hasLastName = req.lastName !== undefined;
-      const hasPhone = req.phone !== undefined;
-      const hasEmail = req.email !== undefined;
-      const hasInstagram = req.instagram !== undefined;
-      const hasMessenger = req.messenger !== undefined;
+      // Update fields individually
+      let hasUpdates = false;
 
-      if (!hasFirstName && !hasLastName && !hasPhone && !hasEmail && !hasInstagram && !hasMessenger) {
+      if (req.firstName !== undefined) {
+        await db.exec`UPDATE clients SET first_name = ${req.firstName.trim()}, updated_at = NOW() WHERE id = ${req.id}`;
+        hasUpdates = true;
+      }
+      if (req.lastName !== undefined) {
+        await db.exec`UPDATE clients SET last_name = ${req.lastName.trim()}, updated_at = NOW() WHERE id = ${req.id}`;
+        hasUpdates = true;
+      }
+      if (req.phone !== undefined) {
+        const cleanPhone = req.phone.replace(/[\s-]/g, '');
+        await db.exec`UPDATE clients SET phone = ${cleanPhone}, updated_at = NOW() WHERE id = ${req.id}`;
+        hasUpdates = true;
+      }
+      if (req.email !== undefined) {
+        const cleanEmail = req.email.toLowerCase().trim();
+        await db.exec`UPDATE clients SET email = ${cleanEmail}, updated_at = NOW() WHERE id = ${req.id}`;
+        hasUpdates = true;
+      }
+      if (req.instagram !== undefined) {
+        const cleanInstagram = req.instagram.toLowerCase().trim();
+        await db.exec`UPDATE clients SET instagram = ${cleanInstagram}, updated_at = NOW() WHERE id = ${req.id}`;
+        hasUpdates = true;
+      }
+      if (req.messenger !== undefined) {
+        await db.exec`UPDATE clients SET messenger = ${req.messenger.trim()}, updated_at = NOW() WHERE id = ${req.id}`;
+        hasUpdates = true;
+      }
+
+      if (!hasUpdates) {
         throw APIError.invalidArgument("Brak danych do aktualizacji");
       }
 
-      // Build the update query based on what fields are provided
-      if (hasFirstName) {
-        await db.exec`UPDATE clients SET first_name = ${req.firstName!.trim()}, updated_at = ${new Date()} WHERE id = ${req.id}`;
-      }
-      if (hasLastName) {
-        await db.exec`UPDATE clients SET last_name = ${req.lastName!.trim()}, updated_at = ${new Date()} WHERE id = ${req.id}`;
-      }
-      if (hasPhone) {
-        const cleanPhone = req.phone!.replace(/[\s-]/g, '');
-        await db.exec`UPDATE clients SET phone = ${cleanPhone}, updated_at = ${new Date()} WHERE id = ${req.id}`;
-      }
-      if (hasEmail) {
-        const cleanEmail = req.email!.toLowerCase().trim();
-        await db.exec`UPDATE clients SET email = ${cleanEmail}, updated_at = ${new Date()} WHERE id = ${req.id}`;
-      }
-      if (hasInstagram) {
-        const cleanInstagram = req.instagram!.toLowerCase().trim();
-        await db.exec`UPDATE clients SET instagram = ${cleanInstagram}, updated_at = ${new Date()} WHERE id = ${req.id}`;
-      }
-      if (hasMessenger) {
-        await db.exec`UPDATE clients SET messenger = ${req.messenger!.trim()}, updated_at = ${new Date()} WHERE id = ${req.id}`;
-      }
-
-      // Get the updated client
+      // Get updated client
       const updatedClient = await db.queryRow`
         SELECT 
           id, 
@@ -152,11 +151,12 @@ export const update = api<UpdateClientRequest, UpdateClientResponse>(
       `;
 
       if (!updatedClient) {
-        throw APIError.internal("Nie udało się pobrać zaktualizowanego klienta");
+        throw APIError.internal("Nie udało się pobrać zaktualizowanych danych klienta");
       }
 
       logger.info("Client updated successfully", {
         clientId: req.id,
+        updatedFields: Object.keys(req).filter(key => key !== 'id' && req[key as keyof UpdateClientRequest] !== undefined),
         timestamp: new Date().toISOString()
       });
 

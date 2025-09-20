@@ -124,7 +124,7 @@ export default function ClientDetailModal({ client, isOpen, onClose, onClientUpd
           break;
       }
 
-      const response = await backend.update(updateData);
+      const response = await backend.client.update(updateData);
       
       setClientData(response.client);
       onClientUpdate?.(response.client);
