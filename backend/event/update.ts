@@ -19,6 +19,8 @@ export const update = api<UpdateEventRequest, UpdateEventResponse>(
   { method: "PUT", path: "/events/:id", expose: true },
   async (req): Promise<UpdateEventResponse> => {
     try {
+      console.log('🔄 Backend: Updating event', req.id, 'with data:', req);
+      
       // Validate ID
       if (!req.id || req.id <= 0) {
         throw APIError.invalidArgument("Nieprawidłowe ID wizyty");
@@ -41,10 +43,7 @@ export const update = api<UpdateEventRequest, UpdateEventResponse>(
 
       // Check if event exists and get current data
       const existingEvent = await db.queryRow`
-        SELECT e.*, c.first_name, c.last_name 
-        FROM events e 
-        JOIN clients c ON e.client_id = c.id 
-        WHERE e.id = ${req.id}
+        SELECT * FROM events WHERE id = ${req.id}
       `;
 
       if (!existingEvent) {
@@ -69,42 +68,40 @@ export const update = api<UpdateEventRequest, UpdateEventResponse>(
       try {
         // Update fields individually
         if (req.price !== undefined) {
-          await tx.exec`UPDATE events SET price = ${req.price}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+          await tx.exec`UPDATE events SET price = ${req.price} WHERE id = ${req.id}`;
         }
 
         if (req.depositAmount !== undefined) {
-          await tx.exec`UPDATE events SET deposit_amount = ${req.depositAmount}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+          await tx.exec`UPDATE events SET deposit_amount = ${req.depositAmount} WHERE id = ${req.id}`;
         }
 
         if (req.depositStatus !== undefined) {
-          await tx.exec`UPDATE events SET deposit_status = ${req.depositStatus}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+          await tx.exec`UPDATE events SET deposit_status = ${req.depositStatus} WHERE id = ${req.id}`;
         }
 
-        // Get the updated event with client data
+        // Get the updated event
         const updatedEvent = await tx.queryRow<Event>`
           SELECT 
-            e.id,
-            e.client_id as "clientId",
-            c.first_name as "firstName",
-            c.last_name as "lastName", 
-            c.birth_date as "birthDate",
-            c.phone,
-            c.instagram,
-            c.messenger,
-            c.email,
-            e.event_time as "eventTime",
-            e.service,
-            e.price,
-            e.deposit_amount as "depositAmount",
-            e.deposit_due_date as "depositDueDate",
-            e.deposit_status as "depositStatus",
-            e.duration_minutes as "durationMinutes",
-            e.notes,
-            e.created_by as "createdBy",
-            e.created_at as "createdAt"
-          FROM events e
-          JOIN clients c ON e.client_id = c.id
-          WHERE e.id = ${req.id}
+            id,
+            first_name as "firstName",
+            last_name as "lastName", 
+            birth_date as "birthDate",
+            phone,
+            instagram,
+            messenger,
+            email,
+            event_time as "eventTime",
+            service,
+            price,
+            deposit_amount as "depositAmount",
+            deposit_due_date as "depositDueDate",
+            deposit_status as "depositStatus",
+            duration_minutes as "durationMinutes",
+            notes,
+            created_by as "createdBy",
+            created_at as "createdAt"
+          FROM events
+          WHERE id = ${req.id}
         `;
 
         if (!updatedEvent) {
@@ -113,6 +110,8 @@ export const update = api<UpdateEventRequest, UpdateEventResponse>(
 
         await tx.commit();
 
+        console.log('✅ Backend: Event updated successfully:', updatedEvent.id);
+        
         logger.info("Event updated successfully", {
           eventId: req.id,
           timestamp: new Date().toISOString()
@@ -130,6 +129,8 @@ export const update = api<UpdateEventRequest, UpdateEventResponse>(
         throw error;
       }
 
+      console.error('❌ Backend: Error updating event:', error);
+      
       logger.error("Error updating event", {
         eventId: req.id,
         error: error instanceof Error ? error.message : 'Unknown error',
