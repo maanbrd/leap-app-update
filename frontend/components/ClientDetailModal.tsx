@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import backend from '~backend/client';
 import type { Client } from '~backend/client/list';
+import type { Event } from '~backend/event/list';
+import type { SMSHistoryItem } from '~backend/sms/history';
 
 interface ClientDetailModalProps {
   client: Client | null;
@@ -26,24 +28,7 @@ interface ClientDetailModalProps {
   onClientUpdate: (updatedClient: Client) => void;
 }
 
-interface Event {
-  id: number;
-  firstName: string;
-  lastName: string;
-  eventTime: Date;
-  service: string;
-  price: number;
-  status: string;
-}
 
-interface SMS {
-  id: number;
-  phone: string;
-  message: string;
-  status: string;
-  sentAt: Date;
-  templateCode?: string;
-}
 
 export default function ClientDetailModal({ 
   client, 
@@ -55,7 +40,7 @@ export default function ClientDetailModal({
   const [editValue, setEditValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
-  const [smsHistory, setSmsHistory] = useState<SMS[]>([]);
+  const [smsHistory, setSmsHistory] = useState<SMSHistoryItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
 
@@ -89,9 +74,9 @@ export default function ClientDetailModal({
     // Pobierz ostatnie 10 SMS-ów
     setSmsLoading(true);
     try {
-      const smsResponse = await backend.sms.history();
-      const clientSms = smsResponse.smsHistory
-        ?.filter(sms => sms.phone === client.phone)
+      const smsResponse = await backend.sms.getSMSHistory();
+      const clientSms = smsResponse.history
+        ?.filter((sms: SMSHistoryItem) => sms.phone === client.phone)
         .slice(0, 10) || [];
       setSmsHistory(clientSms);
     } catch (error) {
@@ -340,7 +325,7 @@ export default function ClientDetailModal({
                           <div className="text-right">
                             <div className="font-medium">{formatPrice(event.price)}</div>
                             <Badge variant="outline" className="text-xs">
-                              {event.status}
+                              {event.depositStatus}
                             </Badge>
                           </div>
                         </div>
@@ -386,9 +371,9 @@ export default function ClientDetailModal({
                               : sms.message
                             }
                           </div>
-                          {sms.templateCode && (
+                          {sms.templateType && (
                             <div className="text-xs text-muted-foreground mt-1">
-                              Szablon: {sms.templateCode}
+                              Szablon: {sms.templateType}
                             </div>
                           )}
                         </div>
