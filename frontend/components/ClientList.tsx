@@ -193,6 +193,8 @@ export default function ClientList({ onNavigate }: ClientListProps) {
     );
   };
 
+
+
   // Sort functions
   const handleSort = (field: SortField) => {
     setSortConfig(prevConfig => {
