@@ -29,6 +29,7 @@ export default function History({ onNavigate }: HistoryProps) {
   const { refreshTrigger } = useAppContext();
 
   useEffect(() => {
+    console.log('🔄 History useEffect wywołany z refreshTrigger:', refreshTrigger);
     loadHistory();
   }, [refreshTrigger]);
 
@@ -38,10 +39,12 @@ export default function History({ onNavigate }: HistoryProps) {
 
   const loadHistory = async () => {
     try {
+      console.log('📋 History: Ładuję historię...');
       const eventsResponse = await backend.event.list();
+      console.log('✅ History: Wydarzenia załadowane:', eventsResponse.events.length, 'wydarzeń');
       setEvents(eventsResponse.events);
     } catch (error) {
-      console.error('Error loading history:', error);
+      console.error('❌ History: Error loading history:', error);
     } finally {
       setLoading(false);
     }

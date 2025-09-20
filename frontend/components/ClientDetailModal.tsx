@@ -47,7 +47,7 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
     try {
       const eventsResponse = await backend.event.list();
       const clientEvents = eventsResponse.events.filter(event => 
-        event.clientId === client.id
+        event.firstName === client.firstName && event.lastName === client.lastName
       ).slice(0, 10);
       setEvents(clientEvents);
 

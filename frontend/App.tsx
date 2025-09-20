@@ -46,8 +46,10 @@ function AppContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🚀 Rozpoczynam dodawanie wydarzenia...', formData);
+    
     try {
-      await backend.event.create({
+      const result = await backend.event.create({
         firstName: formData.firstName,
         lastName: formData.lastName,
         birthDate: formData.birthDate || undefined,
@@ -65,6 +67,16 @@ function AppContent() {
         notes: formData.notes || undefined,
         createdBy: user?.name || formData.createdBy
       });
+
+      console.log('✅ Wydarzenie dodane pomyślnie:', result);
+      
+      // Check database state
+      try {
+        const debugData = await backend.debug.checkData();
+        console.log('🔍 Debug - dane w bazie:', debugData);
+      } catch (debugError) {
+        console.warn('⚠️ Nie można pobrać danych debug:', debugError);
+      }
 
       toast({
         title: "Sukces",
@@ -91,13 +103,14 @@ function AppContent() {
       });
 
       // Trigger refresh for all components
+      console.log('🔄 triggerRefresh wywołany!');
       triggerRefresh();
       setLastEventCreated(new Date());
       
       // 🔧 NAPRAWA: Przekieruj do listy wizyt po pomyślnym utworzeniu
       setCurrentView('list');
     } catch (error) {
-      console.error('Error creating event:', error);
+      console.error('❌ Error creating event:', error);
       toast({
         title: "Błąd",
         description: "Nie udało się dodać wizyty",

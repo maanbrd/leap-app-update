@@ -17,15 +17,18 @@ export default function Calendar({ onNavigate }: CalendarProps) {
   const { refreshTrigger } = useAppContext();
 
   useEffect(() => {
+    console.log('🔄 Calendar useEffect wywołany z refreshTrigger:', refreshTrigger);
     loadEvents();
   }, [refreshTrigger]);
 
   const loadEvents = async () => {
     try {
+      console.log('📅 Calendar: Ładuję wydarzenia...');
       const response = await backend.event.list();
+      console.log('✅ Calendar: Wydarzenia załadowane:', response.events.length, 'wydarzeń');
       setEvents(response.events);
     } catch (error) {
-      console.error('Error loading events:', error);
+      console.error('❌ Calendar: Error loading events:', error);
     } finally {
       setLoading(false);
     }

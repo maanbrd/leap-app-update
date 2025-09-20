@@ -16,15 +16,18 @@ export default function EventList({ onBackToForm }: EventListProps) {
   const { refreshTrigger } = useAppContext();
 
   useEffect(() => {
+    console.log('🔄 EventList useEffect wywołany z refreshTrigger:', refreshTrigger);
     loadEvents();
   }, [refreshTrigger]);
 
   const loadEvents = async () => {
     try {
+      console.log('📅 Ładuję wydarzenia...');
       const response = await backend.event.list();
+      console.log('✅ Wydarzenia załadowane:', response.events.length, 'wydarzeń');
       setEvents(response.events);
     } catch (error) {
-      console.error('Error loading events:', error);
+      console.error('❌ Error loading events:', error);
     } finally {
       setLoading(false);
     }

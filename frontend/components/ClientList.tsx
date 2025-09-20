@@ -34,6 +34,7 @@ export default function ClientList({ onNavigate }: ClientListProps) {
   const clientsPerPage = 12;
 
   useEffect(() => {
+    console.log('🔄 ClientList useEffect wywołany z refreshTrigger:', refreshTrigger);
     loadClients();
   }, [refreshTrigger]);
 
@@ -145,10 +146,12 @@ export default function ClientList({ onNavigate }: ClientListProps) {
 
   const loadClients = async () => {
     try {
+      console.log('📋 Ładuję klientów...');
       const response = await backend.client.list();
+      console.log('✅ Klienci załadowani:', response.clients.length, 'klientów');
       setClients(response.clients);
     } catch (error) {
-      console.error('Error loading clients:', error);
+      console.error('❌ Error loading clients:', error);
     } finally {
       setLoading(false);
     }

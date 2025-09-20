@@ -68,6 +68,7 @@ export default function SMS({ onNavigate }: SMSProps) {
 
   // Load data on component mount and when refresh is triggered
   useEffect(() => {
+    console.log('🔄 SMS useEffect wywołany z refreshTrigger:', refreshTrigger);
     loadSMSHistory();
     loadClients();
     
@@ -100,10 +101,12 @@ export default function SMS({ onNavigate }: SMSProps) {
   // Load clients for manual SMS sending
   const loadClients = async () => {
     try {
+      console.log('📋 SMS: Ładuję klientów...');
       const response = await backend.client.list();
+      console.log('✅ SMS: Klienci załadowani:', response.clients.length, 'klientów');
       setClients(response.clients);
     } catch (error) {
-      console.error('Error loading clients:', error);
+      console.error('❌ SMS: Error loading clients:', error);
     }
   };
 

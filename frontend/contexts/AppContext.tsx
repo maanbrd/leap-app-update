@@ -26,7 +26,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [lastEventCreated, setLastEventCreated] = useState<Date | null>(null);
 
   const triggerRefresh = useCallback(() => {
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger(prev => {
+      const newValue = prev + 1;
+      console.log('🔄 triggerRefresh wywołany! Nowa wartość:', newValue);
+      return newValue;
+    });
   }, []);
 
   const value: AppContextType = {
