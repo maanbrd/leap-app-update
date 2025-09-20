@@ -1,13 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import backend from '~backend/client';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
-import type { Client } from '~backend/client/list';
+import { Badge } from '@/components/ui/badge';
+import { Search, User, Phone, Mail, Instagram, MessageCircle } from 'lucide-react';
+import backend from '~backend/client';
+
+interface Client {
+  id: number;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  email?: string;
+  instagram?: string;
+  messenger?: string;
+  notes?: string;
+  status: 'nowy' | 'aktywny' | 'nieaktywny' | 'zbanowany';
+  createdAt: Date;
+}
 
 interface ClientListProps {
-  onNavigate: (view: 'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history') => void;
+  onNavigate: (view: string) => void;
 }
 
 export default function ClientList({ onNavigate }: ClientListProps) {
@@ -15,44 +28,83 @@ export default function ClientList({ onNavigate }: ClientListProps) {
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const clientsPerPage = 10;
 
+  // Pobierz klientów z API
   useEffect(() => {
-    loadClients();
-  }, []);
+    fetchClients();
+  }, [currentPage]);
 
+  // Real-time search
   useEffect(() => {
     if (searchTerm.trim() === '') {
       setFilteredClients(clients);
     } else {
-      const filtered = clients.filter(client => 
-        `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const filtered = clients.filter(client => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          client.firstName.toLowerCase().includes(searchLower) ||
+          client.lastName.toLowerCase().includes(searchLower) ||
+          (client.phone && client.phone.includes(searchTerm)) ||
+          (client.email && client.email.toLowerCase().includes(searchLower)) ||
+          (client.instagram && client.instagram.toLowerCase().includes(searchLower))
+        );
+      });
       setFilteredClients(filtered);
     }
   }, [searchTerm, clients]);
 
-  const loadClients = async () => {
+  const fetchClients = async () => {
     try {
+      setLoading(true);
       const response = await backend.client.list();
-      setClients(response.clients);
-      setFilteredClients(response.clients);
+      setClients(response.clients || []);
+      setFilteredClients(response.clients || []);
+      
+      // Oblicz paginację
+      const total = response.clients?.length || 0;
+      setTotalPages(Math.ceil(total / clientsPerPage));
     } catch (error) {
-      console.error('Error loading clients:', error);
+      console.error('Error fetching clients:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (dateString: string | Date) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pl-PL');
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'nowy': return 'bg-blue-100 text-blue-800';
+      case 'aktywny': return 'bg-green-100 text-green-800';
+      case 'nieaktywny': return 'bg-yellow-100 text-yellow-800';
+      case 'zbanowany': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'nowy': return 'Nowy';
+      case 'aktywny': return 'Aktywny';
+      case 'nieaktywny': return 'Nieaktywny';
+      case 'zbanowany': return 'Zbanowany';
+      default: return status;
+    }
+  };
+
+  // Paginacja
+  const startIndex = (currentPage - 1) * clientsPerPage;
+  const endIndex = startIndex + clientsPerPage;
+  const paginatedClients = filteredClients.slice(startIndex, endIndex);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background p-8">
         <div className="max-w-6xl mx-auto">
-          <p className="text-center">Ładowanie klientów...</p>
+          <div className="flex justify-center items-center h-64">
+            <div className="text-lg">Ładowanie klientów...</div>
+          </div>
         </div>
       </div>
     );
@@ -61,30 +113,25 @@ export default function ClientList({ onNavigate }: ClientListProps) {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto">
+        {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Klienci</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onNavigate('menu')}>
-              ← Menu główne
-            </Button>
-            <Button variant="outline" onClick={() => onNavigate('form')}>
-              Dodaj wizytę
-            </Button>
-            <Button variant="outline" onClick={() => onNavigate('list')}>
-              Zobacz wizyty
-            </Button>
-            <Button variant="outline" onClick={() => onNavigate('calendar')}>
-              Kalendarz
-            </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Klienci</h1>
+            <p className="text-muted-foreground mt-2">
+              {filteredClients.length} klientów
+            </p>
           </div>
+          <Button variant="outline" onClick={() => onNavigate('menu')}>
+            ← Menu główne
+          </Button>
         </div>
 
+        {/* Search */}
         <div className="mb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              type="text"
-              placeholder="Wyszukaj po imieniu i nazwisku..."
+              placeholder="Szukaj po imieniu, nazwisku, telefonie, email, Instagram..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -92,65 +139,113 @@ export default function ClientList({ onNavigate }: ClientListProps) {
           </div>
         </div>
 
-        {filteredClients.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">
-                {searchTerm ? 'Nie znaleziono klientów pasujących do wyszukiwania' : 'Brak klientów w systemie'}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {filteredClients.map((client) => (
-              <Card key={client.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">
-                      📁 {client.firstName} {client.lastName}
-                    </CardTitle>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">
-                        Klient: {client.createdBy}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Dodano: {formatDate(client.createdAt)}
-                      </p>
+        {/* Clients Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {paginatedClients.map((client) => (
+            <Card key={client.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-lg">
+                    {client.firstName} {client.lastName}
+                  </CardTitle>
+                  <Badge className={getStatusColor(client.status)}>
+                    {getStatusLabel(client.status)}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Contact Info */}
+                <div className="space-y-2">
+                  {client.phone && (
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Phone className="h-4 w-4 mr-2" />
+                      {client.phone}
                     </div>
+                  )}
+                  {client.email && (
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Mail className="h-4 w-4 mr-2" />
+                      {client.email}
+                    </div>
+                  )}
+                  {client.instagram && (
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Instagram className="h-4 w-4 mr-2" />
+                      @{client.instagram}
+                    </div>
+                  )}
+                  {client.messenger && (
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      {client.messenger}
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes Preview */}
+                {client.notes && (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="truncate">{client.notes}</p>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <h4 className="font-medium mb-2 text-sm">Dane osobowe</h4>
-                      {client.birthDate && (
-                        <p className="text-sm">🎂 {formatDate(client.birthDate)}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium mb-2 text-sm">Kontakt</h4>
-                      {client.phone && <p className="text-sm">📞 {client.phone}</p>}
-                      {client.email && <p className="text-sm">✉️ {client.email}</p>}
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium mb-2 text-sm">Social Media</h4>
-                      {client.instagram && <p className="text-sm">📱 {client.instagram}</p>}
-                      {client.messenger && <p className="text-sm">💬 {client.messenger}</p>}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => {/* TODO: Open modal */}}
+                  >
+                    Zobacz więcej
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              ← Poprzednia
+            </Button>
+            
+            <span className="text-sm text-muted-foreground">
+              Strona {currentPage} z {totalPages}
+            </span>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Następna →
+            </Button>
           </div>
         )}
 
-        <div className="mt-8 p-4 bg-muted rounded-lg">
-          <p className="text-sm text-muted-foreground">
-            📊 Łącznie klientów: {clients.length} | Wyświetlanych: {filteredClients.length}
-          </p>
-        </div>
+        {/* Empty State */}
+        {filteredClients.length === 0 && (
+          <div className="text-center py-12">
+            <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">
+              {searchTerm ? 'Nie znaleziono klientów' : 'Brak klientów'}
+            </h3>
+            <p className="text-muted-foreground">
+              {searchTerm 
+                ? 'Spróbuj zmienić kryteria wyszukiwania'
+                : 'Dodaj pierwszego klienta przez formularz wizyty'
+              }
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
