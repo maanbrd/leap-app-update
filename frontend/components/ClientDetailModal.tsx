@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { 
   X, 
@@ -30,6 +31,8 @@ interface ClientDetailModalProps {
   onClientUpdate: (updatedClient: Client) => void;
 }
 
+type DepositStatus = "zapłacony" | "niezapłacony" | "nie dotyczy";
+
 export default function ClientDetailModal({ 
   client, 
   isOpen, 
@@ -44,6 +47,12 @@ export default function ClientDetailModal({
   const [eventsLoading, setEventsLoading] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
   const { toast } = useToast();
+
+  // Event editing state
+  const [editingEvent, setEditingEvent] = useState<number | null>(null);
+  const [editingEventField, setEditingEventField] = useState<string | null>(null);
+  const [eventEditValue, setEventEditValue] = useState('');
+  const [eventLoading, setEventLoading] = useState(false);
 
   // Pobierz historię wizyt i SMS-ów
   useEffect(() => {
@@ -87,6 +96,7 @@ export default function ClientDetailModal({
     }
   };
 
+  // Client editing functions
   const startEditing = (field: string, currentValue: string) => {
     setEditingField(field);
     setEditValue(currentValue || '');
@@ -102,7 +112,6 @@ export default function ClientDetailModal({
 
     setLoading(true);
     try {
-      // Wywołaj API do aktualizacji klienta
       const response = await backend.client.update({
         id: client.id,
         [editingField]: editValue
@@ -115,7 +124,6 @@ export default function ClientDetailModal({
       };
       onClientUpdate(updatedClientWithMissingFields);
       
-      // Pokaż komunikat sukcesu
       toast({
         title: "Sukces",
         description: "Dane klienta zostały zaktualizowane"
@@ -127,7 +135,6 @@ export default function ClientDetailModal({
     } catch (error: any) {
       console.error('Error updating client:', error);
       
-      // Pokaż komunikat błędu
       toast({
         title: "Błąd",
         description: error.message || "Nie udało się zaktualizować danych klienta",
@@ -135,6 +142,63 @@ export default function ClientDetailModal({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Event editing functions
+  const startEditingEvent = (eventId: number, field: string, currentValue: any) => {
+    setEditingEvent(eventId);
+    setEditingEventField(field);
+    setEventEditValue(currentValue?.toString() || '');
+  };
+
+  const cancelEditingEvent = () => {
+    setEditingEvent(null);
+    setEditingEventField(null);
+    setEventEditValue('');
+  };
+
+  const saveEventField = async () => {
+    if (!editingEvent || !editingEventField) return;
+
+    setEventLoading(true);
+    try {
+      const updateData: any = { id: editingEvent };
+      
+      if (editingEventField === 'price' || editingEventField === 'depositAmount') {
+        updateData[editingEventField] = parseInt(eventEditValue) || 0;
+      } else {
+        updateData[editingEventField] = eventEditValue;
+      }
+
+      const response = await backend.event.update(updateData);
+      
+      // Update events list
+      setEvents(prevEvents => 
+        prevEvents.map(event => 
+          event.id === editingEvent ? { ...event, ...response.event } : event
+        )
+      );
+      
+      toast({
+        title: "Sukces",
+        description: "Dane wizyty zostały zaktualizowane"
+      });
+      
+      setEditingEvent(null);
+      setEditingEventField(null);
+      setEventEditValue('');
+      
+    } catch (error: any) {
+      console.error('Error updating event:', error);
+      
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się zaktualizować danych wizyty",
+        variant: "destructive"
+      });
+    } finally {
+      setEventLoading(false);
     }
   };
 
@@ -149,7 +213,16 @@ export default function ClientDetailModal({
   };
 
   const formatPrice = (price: number) => {
-    return `${price.toFixed(2)} zł`;
+    return `${price} zł`;
+  };
+
+  const getDepositStatusColor = (status: string) => {
+    switch (status) {
+      case 'zapłacony': return 'bg-green-100 text-green-800';
+      case 'niezapłacony': return 'bg-red-100 text-red-800';
+      case 'nie dotyczy': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   if (!isOpen || !client) return null;
@@ -387,18 +460,155 @@ export default function ClientDetailModal({
                   ) : events.length > 0 ? (
                     <div className="space-y-3">
                       {events.map((event) => (
-                        <div key={event.id} className="flex justify-between items-center p-3 border rounded">
-                          <div>
-                            <div className="font-medium">{event.service}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {formatDate(event.eventTime)}
+                        <div key={event.id} className="p-3 border rounded">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="font-medium">{event.service}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {formatDate(event.eventTime)}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-medium">{formatPrice(event.price)}</div>
-                            <Badge variant="outline" className="text-xs">
-                              {event.depositStatus}
-                            </Badge>
+                          
+                          {/* Editable Fields */}
+                          <div className="space-y-2">
+                            {/* Price */}
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium">Cena:</span>
+                              {editingEvent === event.id && editingEventField === 'price' ? (
+                                <div className="flex gap-2">
+                                  <Input
+                                    type="number"
+                                    value={eventEditValue}
+                                    onChange={(e) => setEventEditValue(e.target.value)}
+                                    placeholder="0"
+                                    className="w-20"
+                                    disabled={eventLoading}
+                                  />
+                                  <span className="text-sm">zł</span>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={saveEventField} 
+                                    disabled={eventLoading}
+                                  >
+                                    {eventLoading ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Save className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={cancelEditingEvent}
+                                    disabled={eventLoading}
+                                  >
+                                    <XIcon className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div 
+                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded"
+                                  onClick={() => startEditingEvent(event.id, 'price', event.price)}
+                                >
+                                  <span className="text-sm">{formatPrice(event.price)}</span>
+                                  <Edit3 className="h-3 w-3 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Deposit Amount */}
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium">Zadatek:</span>
+                              {editingEvent === event.id && editingEventField === 'depositAmount' ? (
+                                <div className="flex gap-2">
+                                  <Input
+                                    type="number"
+                                    value={eventEditValue}
+                                    onChange={(e) => setEventEditValue(e.target.value)}
+                                    placeholder="0"
+                                    className="w-20"
+                                    disabled={eventLoading}
+                                  />
+                                  <span className="text-sm">zł</span>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={saveEventField} 
+                                    disabled={eventLoading}
+                                  >
+                                    {eventLoading ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Save className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={cancelEditingEvent}
+                                    disabled={eventLoading}
+                                  >
+                                    <XIcon className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div 
+                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded"
+                                  onClick={() => startEditingEvent(event.id, 'depositAmount', event.depositAmount || 0)}
+                                >
+                                  <span className="text-sm">{formatPrice(event.depositAmount || 0)}</span>
+                                  <Edit3 className="h-3 w-3 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Deposit Status */}
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium">Status zadatku:</span>
+                              {editingEvent === event.id && editingEventField === 'depositStatus' ? (
+                                <div className="flex gap-2">
+                                  <Select value={eventEditValue} onValueChange={setEventEditValue}>
+                                    <SelectTrigger className="w-32">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="zapłacony">Zapłacony</SelectItem>
+                                      <SelectItem value="niezapłacony">Niezapłacony</SelectItem>
+                                      <SelectItem value="nie dotyczy">Nie dotyczy</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={saveEventField} 
+                                    disabled={eventLoading}
+                                  >
+                                    {eventLoading ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Save className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={cancelEditingEvent}
+                                    disabled={eventLoading}
+                                  >
+                                    <XIcon className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div 
+                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded"
+                                  onClick={() => startEditingEvent(event.id, 'depositStatus', event.depositStatus)}
+                                >
+                                  <Badge className={getDepositStatusColor(event.depositStatus)}>
+                                    {event.depositStatus}
+                                  </Badge>
+                                  <Edit3 className="h-3 w-3 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}
