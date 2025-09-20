@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { Event } from '~backend/event/list';
+import { useAppContext } from '../contexts/AppContext';
 
 interface EventListProps {
   onBackToForm: () => void;
@@ -12,10 +13,11 @@ interface EventListProps {
 export default function EventList({ onBackToForm }: EventListProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const { refreshTrigger } = useAppContext();
 
   useEffect(() => {
     loadEvents();
-  }, []);
+  }, [refreshTrigger]);
 
   const loadEvents = async () => {
     try {

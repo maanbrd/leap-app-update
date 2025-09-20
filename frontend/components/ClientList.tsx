@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, User, Phone, Mail, Instagram, MessageCircle, Calendar, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import type { Client } from '~backend/client/list';
 import ClientDetailModal from './ClientDetailModal';
+import { useAppContext } from '../contexts/AppContext';
 
 interface ClientListProps {
   onNavigate: (view: 'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history') => void;
@@ -25,6 +26,7 @@ export default function ClientList({ onNavigate }: ClientListProps) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const { refreshTrigger } = useAppContext();
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,7 +35,7 @@ export default function ClientList({ onNavigate }: ClientListProps) {
 
   useEffect(() => {
     loadClients();
-  }, []);
+  }, [refreshTrigger]);
 
   const polishCollation = (str: string) => {
     return str

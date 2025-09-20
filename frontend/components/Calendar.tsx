@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Event } from '~backend/event/list';
+import { useAppContext } from '../contexts/AppContext';
 
 interface CalendarProps {
   onNavigate: (view: 'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history') => void;
@@ -13,10 +14,11 @@ export default function Calendar({ onNavigate }: CalendarProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
+  const { refreshTrigger } = useAppContext();
 
   useEffect(() => {
     loadEvents();
-  }, []);
+  }, [refreshTrigger]);
 
   const loadEvents = async () => {
     try {

@@ -17,11 +17,13 @@ import Settings from './components/Settings';
 import SMS from './components/SMS';
 import AIChat from './components/AIChat';
 import { useAuth } from './hooks/useAuth';
+import { AppProvider, useAppContext } from './contexts/AppContext';
 
-export default function App() {
+function AppContent() {
   const [currentView, setCurrentView] = useState<'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history'>('menu');
   const { toast } = useToast();
   const { user, loading: userLoading } = useAuth();
+  const { triggerRefresh, setLastEventCreated } = useAppContext();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -88,6 +90,10 @@ export default function App() {
         createdBy: user?.name || 'Admin'
       });
 
+      // Trigger refresh for all components
+      triggerRefresh();
+      setLastEventCreated(new Date());
+      
       // 🔧 NAPRAWA: Przekieruj do listy wizyt po pomyślnym utworzeniu
       setCurrentView('list');
     } catch (error) {
@@ -378,5 +384,13 @@ export default function App() {
       <AIChat />
       <Toaster />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
   );
 }

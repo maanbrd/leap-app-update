@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import backend from '~backend/client';
+import { useAppContext } from '../contexts/AppContext';
 
 interface ChatMessage {
   id: string;
@@ -32,6 +33,7 @@ export default function AIChat() {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { refreshTrigger } = useAppContext();
 
   // Initialize userId from localStorage
   useEffect(() => {
@@ -66,6 +68,13 @@ export default function AIChat() {
       loadSuggestions();
     }
   }, [isOpen, userId]);
+
+  // Refresh suggestions when data changes
+  useEffect(() => {
+    if (isOpen && userId && refreshTrigger > 0) {
+      loadSuggestions();
+    }
+  }, [refreshTrigger, isOpen, userId]);
 
   const loadSuggestions = async () => {
     try {

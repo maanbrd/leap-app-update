@@ -11,6 +11,7 @@ import { MessageSquare, Send, History, Edit3, Phone, User, Filter, RefreshCw, Ca
 import { useToast } from '@/components/ui/use-toast';
 import type { Client } from '~backend/client/list';
 import type { SMSHistoryItem } from '~backend/sms/history';
+import { useAppContext } from '../contexts/AppContext';
 
 interface SMSProps {
   onNavigate: (view: 'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history') => void;
@@ -18,6 +19,7 @@ interface SMSProps {
 
 export default function SMS({ onNavigate }: SMSProps) {
   const { toast } = useToast();
+  const { refreshTrigger } = useAppContext();
   
   // State for SMS history and stats
   const [smsHistory, setSmsHistory] = useState<SMSHistoryItem[]>([]);
@@ -64,7 +66,7 @@ export default function SMS({ onNavigate }: SMSProps) {
     SMS_DEPOSIT_AFTER: "SMS po terminie zadatku"
   };
 
-  // Load data on component mount
+  // Load data on component mount and when refresh is triggered
   useEffect(() => {
     loadSMSHistory();
     loadClients();
@@ -75,7 +77,7 @@ export default function SMS({ onNavigate }: SMSProps) {
     }, 30000); // Poll every 30 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshTrigger]);
 
   // Load SMS history with filters
   const loadSMSHistory = async () => {

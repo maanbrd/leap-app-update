@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, User, Phone, Mail } from 'lucide-react';
 import type { Event } from '~backend/event/list';
+import { useAppContext } from '../contexts/AppContext';
 
 interface HistoryProps {
   onNavigate: (view: 'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history') => void;
@@ -25,10 +26,11 @@ export default function History({ onNavigate }: HistoryProps) {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [dateFilter, setDateFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const { refreshTrigger } = useAppContext();
 
   useEffect(() => {
     loadHistory();
-  }, []);
+  }, [refreshTrigger]);
 
   useEffect(() => {
     filterHistory();
