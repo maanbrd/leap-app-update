@@ -4,10 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, User, Phone, Mail, Instagram, MessageCircle } from 'lucide-react';
 import backend from '~backend/client';
-import type { Client } from '~backend/client';
+import type { Client } from '~backend/client/list';
 
 interface ClientListProps {
-  onNavigate: (view: string) => void;
+  onNavigate: (view: 'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history') => void;
 }
 
 export default function ClientList({ onNavigate }: ClientListProps) {
@@ -143,13 +143,6 @@ export default function ClientList({ onNavigate }: ClientListProps) {
                     </div>
                   )}
                 </div>
-
-                {/* Notes Preview */}
-                {client.notes && (
-                  <div className="text-sm text-muted-foreground">
-                    <p className="truncate">{client.notes}</p>
-                  </div>
-                )}
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
