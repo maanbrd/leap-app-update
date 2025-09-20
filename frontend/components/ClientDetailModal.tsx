@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 import { 
   X, 
   Phone, 
@@ -14,7 +15,8 @@ import {
   MessageSquare,
   Edit3,
   Save,
-  X as XIcon
+  X as XIcon,
+  Loader2
 } from 'lucide-react';
 import backend from '~backend/client';
 import type { Client } from '~backend/client/list';
@@ -27,8 +29,6 @@ interface ClientDetailModalProps {
   onClose: () => void;
   onClientUpdate: (updatedClient: Client) => void;
 }
-
-
 
 export default function ClientDetailModal({ 
   client, 
@@ -43,6 +43,7 @@ export default function ClientDetailModal({
   const [smsHistory, setSmsHistory] = useState<SMSHistoryItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
+  const { toast } = useToast();
 
   // Pobierz historię wizyt i SMS-ów
   useEffect(() => {
@@ -76,7 +77,7 @@ export default function ClientDetailModal({
     try {
       const smsResponse = await backend.sms.getSMSHistory();
       const clientSms = smsResponse.history
-        ?.filter((sms: SMSHistoryItem) => sms.phone === client.phone)
+        ?.filter(sms => sms.phone === client.phone)
         .slice(0, 10) || [];
       setSmsHistory(clientSms);
     } catch (error) {
@@ -101,22 +102,37 @@ export default function ClientDetailModal({
 
     setLoading(true);
     try {
-      // TODO: Implement backend.client.update endpoint
-      const updatedClient = {
-        ...client,
+      // Wywołaj API do aktualizacji klienta
+      const response = await backend.client.update({
+        id: client.id,
         [editingField]: editValue
+      });
+      
+      // Update local state with merged data
+      const updatedClientWithMissingFields = {
+        ...client,
+        ...response.client
       };
+      onClientUpdate(updatedClientWithMissingFields);
       
-      // Update local state
-      onClientUpdate(updatedClient);
-      
-      // TODO: Call API to update client
-      // await backend.client.update(client.id, { [editingField]: editValue });
+      // Pokaż komunikat sukcesu
+      toast({
+        title: "Sukces",
+        description: "Dane klienta zostały zaktualizowane"
+      });
       
       setEditingField(null);
       setEditValue('');
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('Error updating client:', error);
+      
+      // Pokaż komunikat błędu
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się zaktualizować danych klienta",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -182,11 +198,25 @@ export default function ClientDetailModal({
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           placeholder="+48 123 456 789"
+                          disabled={loading}
                         />
-                        <Button size="sm" onClick={saveField} disabled={loading}>
-                          <Save className="h-4 w-4" />
+                        <Button 
+                          size="sm" 
+                          onClick={saveField} 
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={cancelEditing}>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={cancelEditing}
+                          disabled={loading}
+                        >
                           <XIcon className="h-4 w-4" />
                         </Button>
                       </div>
@@ -214,11 +244,25 @@ export default function ClientDetailModal({
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           placeholder="email@example.com"
+                          disabled={loading}
                         />
-                        <Button size="sm" onClick={saveField} disabled={loading}>
-                          <Save className="h-4 w-4" />
+                        <Button 
+                          size="sm" 
+                          onClick={saveField} 
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={cancelEditing}>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={cancelEditing}
+                          disabled={loading}
+                        >
                           <XIcon className="h-4 w-4" />
                         </Button>
                       </div>
@@ -245,11 +289,25 @@ export default function ClientDetailModal({
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           placeholder="@username"
+                          disabled={loading}
                         />
-                        <Button size="sm" onClick={saveField} disabled={loading}>
-                          <Save className="h-4 w-4" />
+                        <Button 
+                          size="sm" 
+                          onClick={saveField} 
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={cancelEditing}>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={cancelEditing}
+                          disabled={loading}
+                        >
                           <XIcon className="h-4 w-4" />
                         </Button>
                       </div>
@@ -276,11 +334,25 @@ export default function ClientDetailModal({
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           placeholder="Messenger username"
+                          disabled={loading}
                         />
-                        <Button size="sm" onClick={saveField} disabled={loading}>
-                          <Save className="h-4 w-4" />
+                        <Button 
+                          size="sm" 
+                          onClick={saveField} 
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={cancelEditing}>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={cancelEditing}
+                          disabled={loading}
+                        >
                           <XIcon className="h-4 w-4" />
                         </Button>
                       </div>
