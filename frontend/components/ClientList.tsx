@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, User, Phone, Mail, Instagram, MessageCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Search, User, Phone, Mail, Instagram, MessageCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import backend from '~backend/client';
 import type { Client } from '~backend/client/list';
 import ClientDetailModal from './ClientDetailModal';
@@ -11,10 +13,20 @@ interface ClientListProps {
   onNavigate: (view: 'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history') => void;
 }
 
+type ClientStatus = 'nowy' | 'aktywny' | 'nieaktywny' | 'zbanowany';
+type SortField = 'lastName' | 'firstName' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfig {
+  field: SortField;
+  direction: SortDirection;
+}
+
 export default function ClientList({ onNavigate }: ClientListProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ClientStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -24,18 +36,102 @@ export default function ClientList({ onNavigate }: ClientListProps) {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Sort state
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    field: 'lastName',
+    direction: 'asc'
+  });
+
   // Pobierz klientów z API
   useEffect(() => {
     fetchClients();
   }, [currentPage]);
 
-  // Real-time search
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredClients(clients);
-    } else {
-      const filtered = clients.filter(client => {
-        const searchLower = searchTerm.toLowerCase();
+  // Polish collation function
+  const polishCollation = (str: string) => {
+    return str
+      .toLowerCase()
+      .replace(/ą/g, 'a')
+      .replace(/ć/g, 'c')
+      .replace(/ę/g, 'e')
+      .replace(/ł/g, 'l')
+      .replace(/ń/g, 'n')
+      .replace(/ó/g, 'o')
+      .replace(/ś/g, 's')
+      .replace(/ź/g, 'z')
+      .replace(/ż/g, 'z');
+  };
+
+  // Determine client status based on business logic
+  const getClientStatus = (client: Client): ClientStatus => {
+    // TODO: Implement business logic based on:
+    // - Last visit date
+    // - Number of visits
+    // - Payment status
+    // - Manual status override
+    
+    // For now, return 'nowy' for all clients
+    // This should be replaced with actual business logic
+    return 'nowy';
+  };
+
+  // Sort clients with Polish collation
+  const sortClients = (clients: Client[], config: SortConfig): Client[] => {
+    return [...clients].sort((a, b) => {
+      let aValue: string;
+      let bValue: string;
+
+      switch (config.field) {
+        case 'lastName':
+          aValue = a.lastName || '';
+          bValue = b.lastName || '';
+          break;
+        case 'firstName':
+          aValue = a.firstName || '';
+          bValue = b.firstName || '';
+          break;
+        case 'createdAt':
+          aValue = new Date(a.createdAt).toISOString();
+          bValue = new Date(b.createdAt).toISOString();
+          break;
+        default:
+          return 0;
+      }
+
+      // Apply Polish collation
+      const aCollated = polishCollation(aValue);
+      const bCollated = polishCollation(bValue);
+
+      let comparison = 0;
+      if (aCollated < bCollated) {
+        comparison = -1;
+      } else if (aCollated > bCollated) {
+        comparison = 1;
+      }
+
+      // Tie-breaker: if last names are equal, sort by first name
+      if (comparison === 0 && config.field === 'lastName') {
+        const aFirstName = polishCollation(a.firstName || '');
+        const bFirstName = polishCollation(b.firstName || '');
+        if (aFirstName < bFirstName) {
+          comparison = -1;
+        } else if (aFirstName > bFirstName) {
+          comparison = 1;
+        }
+      }
+
+      return config.direction === 'asc' ? comparison : -comparison;
+    });
+  };
+
+  // Filter and sort clients
+  const processedClients = useMemo(() => {
+    let filtered = clients;
+
+    // Apply search filter
+    if (searchTerm.trim() !== '') {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(client => {
         return (
           client.firstName.toLowerCase().includes(searchLower) ||
           client.lastName.toLowerCase().includes(searchLower) ||
@@ -44,20 +140,32 @@ export default function ClientList({ onNavigate }: ClientListProps) {
           (client.instagram && client.instagram.toLowerCase().includes(searchLower))
         );
       });
-      setFilteredClients(filtered);
     }
-  }, [searchTerm, clients]);
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(client => getClientStatus(client) === statusFilter);
+    }
+
+    // Apply sorting
+    return sortClients(filtered, sortConfig);
+  }, [clients, searchTerm, statusFilter, sortConfig]);
+
+  // Update filtered clients when processed clients change
+  useEffect(() => {
+    setFilteredClients(processedClients);
+    
+    // Recalculate pagination
+    const total = processedClients.length;
+    setTotalPages(Math.ceil(total / clientsPerPage));
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [processedClients]);
 
   const fetchClients = async () => {
     try {
       setLoading(true);
       const response = await backend.client.list();
       setClients(response.clients || []);
-      setFilteredClients(response.clients || []);
-      
-      // Oblicz paginację
-      const total = response.clients?.length || 0;
-      setTotalPages(Math.ceil(total / clientsPerPage));
     } catch (error) {
       console.error('Error fetching clients:', error);
     } finally {
@@ -83,16 +191,57 @@ export default function ClientList({ onNavigate }: ClientListProps) {
         client.id === updatedClient.id ? updatedClient : client
       )
     );
-    
-    // Update filtered clients
-    setFilteredClients(prevFiltered => 
-      prevFiltered.map(client => 
-        client.id === updatedClient.id ? updatedClient : client
-      )
-    );
   };
 
-  // Paginacja
+  // Sort functions
+  const handleSort = (field: SortField) => {
+    setSortConfig(prevConfig => {
+      if (prevConfig.field === field) {
+        // Toggle direction if same field
+        return {
+          field,
+          direction: prevConfig.direction === 'asc' ? 'desc' : 'asc'
+        };
+      } else {
+        // New field, default to ascending
+        return {
+          field,
+          direction: 'asc'
+        };
+      }
+    });
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortConfig.field !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />;
+    }
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUp className="h-4 w-4" />
+      : <ArrowDown className="h-4 w-4" />;
+  };
+
+  const getStatusColor = (status: ClientStatus) => {
+    switch (status) {
+      case 'nowy': return 'bg-blue-100 text-blue-800';
+      case 'aktywny': return 'bg-green-100 text-green-800';
+      case 'nieaktywny': return 'bg-yellow-100 text-yellow-800';
+      case 'zbanowany': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusLabel = (status: ClientStatus) => {
+    switch (status) {
+      case 'nowy': return 'Nowy';
+      case 'aktywny': return 'Aktywny';
+      case 'nieaktywny': return 'Nieaktywny';
+      case 'zbanowany': return 'Zbanowany';
+      default: return status;
+    }
+  };
+
+  // Pagination
   const startIndex = (currentPage - 1) * clientsPerPage;
   const endIndex = startIndex + clientsPerPage;
   const paginatedClients = filteredClients.slice(startIndex, endIndex);
@@ -119,6 +268,7 @@ export default function ClientList({ onNavigate }: ClientListProps) {
               <h1 className="text-3xl font-bold">Klienci</h1>
               <p className="text-muted-foreground mt-2">
                 {filteredClients.length} klientów
+                {statusFilter !== 'all' && ` (${getStatusLabel(statusFilter as ClientStatus)})`}
               </p>
             </div>
             <Button variant="outline" onClick={() => onNavigate('menu')}>
@@ -126,70 +276,128 @@ export default function ClientList({ onNavigate }: ClientListProps) {
             </Button>
           </div>
 
-          {/* Search */}
-          <div className="mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Szukaj po imieniu, nazwisku, telefonie, email, Instagram..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          {/* Filters and Search */}
+          <div className="mb-6 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Szukaj po imieniu, nazwisku, telefonie, email, Instagram..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="w-full sm:w-48">
+                <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ClientStatus | 'all')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtruj status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Wszyscy klienci</SelectItem>
+                    <SelectItem value="nowy">Nowy</SelectItem>
+                    <SelectItem value="aktywny">Aktywny</SelectItem>
+                    <SelectItem value="nieaktywny">Nieaktywny</SelectItem>
+                    <SelectItem value="zbanowany">Zbanowany</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Sort Controls */}
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>Sortuj:</span>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSort('lastName')}
+                  className="flex items-center gap-1"
+                >
+                  Nazwisko {getSortIcon('lastName')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSort('firstName')}
+                  className="flex items-center gap-1"
+                >
+                  Imię {getSortIcon('firstName')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleSort('createdAt')}
+                  className="flex items-center gap-1"
+                >
+                  Data dodania {getSortIcon('createdAt')}
+                </Button>
+              </div>
             </div>
           </div>
 
           {/* Clients Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {paginatedClients.map((client) => (
-              <Card key={client.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">
-                    {client.firstName} {client.lastName}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Contact Info */}
-                  <div className="space-y-2">
-                    {client.phone && (
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Phone className="h-4 w-4 mr-2" />
-                        {client.phone}
-                      </div>
-                    )}
-                    {client.email && (
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Mail className="h-4 w-4 mr-2" />
-                        {client.email}
-                      </div>
-                    )}
-                    {client.instagram && (
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Instagram className="h-4 w-4 mr-2" />
-                        @{client.instagram}
-                      </div>
-                    )}
-                    {client.messenger && (
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        {client.messenger}
-                      </div>
-                    )}
-                  </div>
+            {paginatedClients.map((client) => {
+              const status = getClientStatus(client);
+              return (
+                <Card key={client.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg">
+                        {client.firstName} {client.lastName}
+                      </CardTitle>
+                      <Badge className={getStatusColor(status)}>
+                        {getStatusLabel(status)}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Contact Info */}
+                    <div className="space-y-2">
+                      {client.phone && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Phone className="h-4 w-4 mr-2" />
+                          {client.phone}
+                        </div>
+                      )}
+                      {client.email && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Mail className="h-4 w-4 mr-2" />
+                          {client.email}
+                        </div>
+                      )}
+                      {client.instagram && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Instagram className="h-4 w-4 mr-2" />
+                          @{client.instagram}
+                        </div>
+                      )}
+                      {client.messenger && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          {client.messenger}
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => openModal(client)}
-                    >
-                      Zobacz więcej
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => openModal(client)}
+                      >
+                        Zobacz więcej
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Pagination */}
@@ -224,11 +432,11 @@ export default function ClientList({ onNavigate }: ClientListProps) {
             <div className="text-center py-12">
               <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">
-                {searchTerm ? 'Nie znaleziono klientów' : 'Brak klientów'}
+                {searchTerm || statusFilter !== 'all' ? 'Nie znaleziono klientów' : 'Brak klientów'}
               </h3>
               <p className="text-muted-foreground">
-                {searchTerm 
-                  ? 'Spróbuj zmienić kryteria wyszukiwania'
+                {searchTerm || statusFilter !== 'all'
+                  ? 'Spróbuj zmienić kryteria wyszukiwania lub filtry'
                   : 'Dodaj pierwszego klienta przez formularz wizyty'
                 }
               </p>
