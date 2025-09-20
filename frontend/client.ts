@@ -108,10 +108,7 @@ import {
     moveEvent as api_ai_management_moveEvent,
     updateDepositStatus as api_ai_management_updateDepositStatus
 } from "~backend/ai/management";
-import {
-    getSession as api_ai_sessions_getSession,
-    saveMessage as api_ai_sessions_saveMessage
-} from "~backend/ai/sessions";
+import { getSession as api_ai_sessions_getSession } from "~backend/ai/sessions";
 
 export namespace ai {
 
@@ -130,7 +127,6 @@ export namespace ai {
             this.getUserPreferences = this.getUserPreferences.bind(this)
             this.logUserInteraction = this.logUserInteraction.bind(this)
             this.moveEvent = this.moveEvent.bind(this)
-            this.saveMessage = this.saveMessage.bind(this)
             this.updateDepositStatus = this.updateDepositStatus.bind(this)
         }
 
@@ -228,15 +224,6 @@ export namespace ai {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/ai/move-event`, {method: "PUT", body: JSON.stringify(params)})
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ai_management_moveEvent>
-        }
-
-        /**
-         * Zapisz wiadomość do sesji
-         */
-        public async saveMessage(params: RequestType<typeof api_ai_sessions_saveMessage>): Promise<ResponseType<typeof api_ai_sessions_saveMessage>> {
-            // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/ai/save-message`, {method: "POST", body: JSON.stringify(params)})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ai_sessions_saveMessage>
         }
 
         /**
