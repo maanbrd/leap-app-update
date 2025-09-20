@@ -287,9 +287,6 @@ export namespace client {
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_client_list_list>
         }
 
-        /**
-         * Updates an existing client
-         */
         public async update(params: RequestType<typeof api_client_update_update>): Promise<ResponseType<typeof api_client_update_update>> {
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
@@ -463,9 +460,6 @@ export namespace event {
             return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_event_list_list>
         }
 
-        /**
-         * Updates an existing event
-         */
         public async update(params: RequestType<typeof api_event_update_update>): Promise<ResponseType<typeof api_event_update_update>> {
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
