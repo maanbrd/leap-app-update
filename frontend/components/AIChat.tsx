@@ -120,12 +120,8 @@ export default function AIChat() {
     }
 
     try {
-      await backend.ai.saveMessage({
-        sessionId: currentSessionId,
-        userId,
-        role,
-        content
-      });
+      // TODO: Implement saveMessage endpoint when AI tables are ready
+      console.log('💾 AI: Would save message:', { sessionId: currentSessionId, userId, role, content });
     } catch (error) {
       console.error('Błąd zapisywania wiadomości:', error);
     }

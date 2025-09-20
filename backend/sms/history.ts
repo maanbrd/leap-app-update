@@ -3,7 +3,7 @@ import db from "../db";
 
 export interface SMSHistoryItem {
   id: string;
-  clientId?: number;
+  clientId?: string;
   phone: string;
   message: string;
   messageId?: string;
@@ -32,13 +32,16 @@ export const getSMSHistory = api(
   { method: "GET", path: "/sms/history", expose: true },
   async (): Promise<GetSMSHistoryResponse> => {
     try {
-      // Sprawdź czy tabela istnieje
+      console.log('📱 SMS: Getting SMS history...');
+      
+      // Sprawdź czy tabela istnieje (PostgreSQL syntax)
       const tableCheck = await db.queryAll`
-        SELECT name FROM sqlite_master 
-        WHERE type='table' AND name='sms_history'
+        SELECT tablename FROM pg_tables 
+        WHERE tablename = 'sms_history'
       `;
 
       if (tableCheck.length === 0) {
+        console.log('⚠️ SMS: Table sms_history does not exist, returning empty data');
         return {
           history: [],
           stats: {
@@ -54,19 +57,15 @@ export const getSMSHistory = api(
       // Pobierz historię SMS (ostatnie 100)
       const history = await db.queryAll<{
         id: string;
+        client_id: string;
         phone: string;
-        message: string;
-        message_id: string;
+        body: string;
+        template_code: string;
         status: string;
-        client_name: string;
-        event_id: number;
-        template_type: string;
-        cost: number;
         sent_at: Date;
       }>`
         SELECT 
-          id, phone, message, message_id, status, client_name,
-          event_id, template_type, cost, sent_at
+          id, client_id, phone, body, template_code, status, sent_at
         FROM sms_history 
         ORDER BY sent_at DESC 
         LIMIT 100
@@ -78,28 +77,25 @@ export const getSMSHistory = api(
         delivered: number;
         failed: number;
         pending: number;
-        total_cost: number;
       }>`
         SELECT 
           COUNT(*) as total_sent,
-          SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered,
+          SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as delivered,
           SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
-          SUM(CASE WHEN status IN ('sent', 'pending') THEN 1 ELSE 0 END) as pending,
-          COALESCE(SUM(cost), 0) as total_cost
+          SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END) as pending
         FROM sms_history
       `;
+
+      console.log(`✅ SMS: Loaded ${history.length} SMS records`);
 
       return {
         history: history.map(item => ({
           id: item.id,
+          clientId: item.client_id,
           phone: item.phone,
-          message: item.message,
-          messageId: item.message_id,
+          message: item.body,
           status: item.status,
-          clientName: item.client_name,
-          eventId: item.event_id,
-          templateType: item.template_type,
-          cost: item.cost,
+          templateType: item.template_code,
           sentAt: item.sent_at
         })),
         stats: {
@@ -107,12 +103,12 @@ export const getSMSHistory = api(
           delivered: stats?.delivered || 0,
           failed: stats?.failed || 0,
           pending: stats?.pending || 0,
-          totalCost: stats?.total_cost || 0
+          totalCost: 0 // SMS table doesn't track cost
         }
       };
 
     } catch (error) {
-      console.error("Błąd pobierania historii SMS:", error);
+      console.error("❌ SMS: Error getting SMS history:", error);
       return {
         history: [],
         stats: {

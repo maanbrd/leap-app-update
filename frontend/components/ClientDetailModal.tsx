@@ -53,7 +53,7 @@ export default function ClientDetailModal({ client, isOpen, onClose }: ClientDet
 
       const smsResponse = await backend.sms.getSMSHistory();
       const clientSms = smsResponse.history.filter(sms => 
-        sms.clientId === client.id
+        sms.clientId === client.id.toString()
       ).slice(0, 10);
       setSmsHistory(clientSms);
     } catch (error) {
