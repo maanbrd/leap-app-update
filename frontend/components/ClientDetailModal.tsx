@@ -46,6 +46,7 @@ export default function ClientDetailModal({
   const [smsHistory, setSmsHistory] = useState<SMSHistoryItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Event editing state
@@ -96,25 +97,66 @@ export default function ClientDetailModal({
     }
   };
 
-  // Client editing functions
+  // Client editing functions with enhanced validation
+  const validateField = (field: string, value: string): string | null => {
+    if (!value.trim()) return null; // Allow empty values
+    
+    switch (field) {
+      case 'phone':
+        // Polish phone number validation
+        const phoneRegex = /^(\+48|48)?[\s-]?[0-9]{3}[\s-]?[0-9]{3}[\s-]?[0-9]{3}$/;
+        if (!phoneRegex.test(value)) {
+          return 'Nieprawidłowy format numeru telefonu (np. +48 123 456 789)';
+        }
+        break;
+      case 'email':
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(value)) {
+          return 'Nieprawidłowy format adresu email';
+        }
+        break;
+      case 'instagram':
+        const instaRegex = /^[a-zA-Z0-9._]{1,30}$/;
+        if (!instaRegex.test(value)) {
+          return 'Instagram może zawierać tylko litery, cyfry, kropki i podkreślenia (max 30 znaków)';
+        }
+        break;
+    }
+    return null;
+  };
+  
   const startEditing = (field: string, currentValue: string) => {
     setEditingField(field);
     setEditValue(currentValue || '');
+    setValidationError(null);
   };
 
   const cancelEditing = () => {
     setEditingField(null);
     setEditValue('');
+    setValidationError(null);
   };
 
   const saveField = async () => {
     if (!client || !editingField) return;
 
+    // Validate field
+    const error = validateField(editingField, editValue);
+    if (error) {
+      setValidationError(error);
+      toast({
+        title: "Błąd walidacji",
+        description: error,
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await backend.client.update({
         id: client.id,
-        [editingField]: editValue
+        [editingField]: editValue.trim()
       });
       
       // Update local state with merged data
@@ -131,6 +173,7 @@ export default function ClientDetailModal({
       
       setEditingField(null);
       setEditValue('');
+      setValidationError(null);
       
     } catch (error: any) {
       console.error('Error updating client:', error);
@@ -267,12 +310,18 @@ export default function ClientDetailModal({
                     </label>
                     {editingField === 'phone' ? (
                       <div className="flex gap-2">
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          placeholder="+48 123 456 789"
-                          disabled={loading}
-                        />
+                        <div className="flex-1">
+                          <Input
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            placeholder="+48 123 456 789"
+                            disabled={loading}
+                            className={validationError && editingField === 'phone' ? 'border-red-500' : ''}
+                          />
+                          {validationError && editingField === 'phone' && (
+                            <p className="text-xs text-red-500 mt-1">{validationError}</p>
+                          )}
+                        </div>
                         <Button 
                           size="sm" 
                           onClick={saveField} 
@@ -295,7 +344,7 @@ export default function ClientDetailModal({
                       </div>
                     ) : (
                       <div 
-                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer"
+                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer transition-colors"
                         onClick={() => startEditing('phone', client.phone || '')}
                       >
                         <span>{client.phone || 'Brak numeru'}</span>
@@ -312,13 +361,19 @@ export default function ClientDetailModal({
                     </label>
                     {editingField === 'email' ? (
                       <div className="flex gap-2">
-                        <Input
-                          type="email"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          placeholder="email@example.com"
-                          disabled={loading}
-                        />
+                        <div className="flex-1">
+                          <Input
+                            type="email"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            placeholder="email@example.com"
+                            disabled={loading}
+                            className={validationError && editingField === 'email' ? 'border-red-500' : ''}
+                          />
+                          {validationError && editingField === 'email' && (
+                            <p className="text-xs text-red-500 mt-1">{validationError}</p>
+                          )}
+                        </div>
                         <Button 
                           size="sm" 
                           onClick={saveField} 
@@ -341,7 +396,7 @@ export default function ClientDetailModal({
                       </div>
                     ) : (
                       <div 
-                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer"
+                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer transition-colors"
                         onClick={() => startEditing('email', client.email || '')}
                       >
                         <span>{client.email || 'Brak email'}</span>
@@ -358,12 +413,18 @@ export default function ClientDetailModal({
                     </label>
                     {editingField === 'instagram' ? (
                       <div className="flex gap-2">
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          placeholder="@username"
-                          disabled={loading}
-                        />
+                        <div className="flex-1">
+                          <Input
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            placeholder="username (bez @)"
+                            disabled={loading}
+                            className={validationError && editingField === 'instagram' ? 'border-red-500' : ''}
+                          />
+                          {validationError && editingField === 'instagram' && (
+                            <p className="text-xs text-red-500 mt-1">{validationError}</p>
+                          )}
+                        </div>
                         <Button 
                           size="sm" 
                           onClick={saveField} 
@@ -386,7 +447,7 @@ export default function ClientDetailModal({
                       </div>
                     ) : (
                       <div 
-                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer"
+                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer transition-colors"
                         onClick={() => startEditing('instagram', client.instagram || '')}
                       >
                         <span>{client.instagram ? `@${client.instagram}` : 'Brak Instagram'}</span>
@@ -403,12 +464,18 @@ export default function ClientDetailModal({
                     </label>
                     {editingField === 'messenger' ? (
                       <div className="flex gap-2">
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          placeholder="Messenger username"
-                          disabled={loading}
-                        />
+                        <div className="flex-1">
+                          <Input
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            placeholder="Messenger username"
+                            disabled={loading}
+                            className={validationError && editingField === 'messenger' ? 'border-red-500' : ''}
+                          />
+                          {validationError && editingField === 'messenger' && (
+                            <p className="text-xs text-red-500 mt-1">{validationError}</p>
+                          )}
+                        </div>
                         <Button 
                           size="sm" 
                           onClick={saveField} 
@@ -431,7 +498,7 @@ export default function ClientDetailModal({
                       </div>
                     ) : (
                       <div 
-                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer"
+                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer transition-colors"
                         onClick={() => startEditing('messenger', client.messenger || '')}
                       >
                         <span>{client.messenger || 'Brak Messenger'}</span>
