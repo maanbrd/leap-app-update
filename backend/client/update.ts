@@ -1,6 +1,7 @@
-import { api, APIError } from "encore.dev/api";
+import { api } from "encore.dev/api";
+import { APIError } from "encore.dev/api";
 import db from "../db";
-import logger from '../utils/logger';
+import logger from "../utils/logger";
 
 export interface UpdateClientRequest {
   id: number;
@@ -21,228 +22,172 @@ export interface UpdateClientResponse {
     email?: string;
     instagram?: string;
     messenger?: string;
+    birthDate?: Date;
     createdAt: Date;
     updatedAt: Date;
+    createdBy: string;
   };
 }
 
-// Updates an existing client
 export const update = api<UpdateClientRequest, UpdateClientResponse>(
   { method: "PUT", path: "/clients/:id", expose: true },
   async (req): Promise<UpdateClientResponse> => {
-    // Walidacja ID
-    if (!req.id || req.id <= 0) {
-      throw APIError.invalidArgument("Nieprawidłowe ID klienta");
-    }
-
-    // Walidacja danych wejściowych
-    if (req.firstName !== undefined && (!req.firstName?.trim())) {
-      throw APIError.invalidArgument("Imię nie może być puste");
-    }
-    
-    if (req.lastName !== undefined && (!req.lastName?.trim())) {
-      throw APIError.invalidArgument("Nazwisko nie może być puste");
-    }
-
-    // Walidacja numeru telefonu (jeśli podany)
-    if (req.phone && !/^(\+48|48)?[0-9]{9}$/.test(req.phone.replace(/[\s-]/g, ''))) {
-      throw APIError.invalidArgument("Nieprawidłowy format numeru telefonu");
-    }
-
-    // Walidacja email (jeśli podany)
-    if (req.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.email)) {
-      throw APIError.invalidArgument("Nieprawidłowy format email");
-    }
-
-    // Walidacja Instagram (jeśli podany)
-    if (req.instagram && !/^[a-zA-Z0-9._]+$/.test(req.instagram)) {
-      throw APIError.invalidArgument("Nieprawidłowy format Instagram (tylko litery, cyfry, kropki, podkreślenia)");
-    }
-
-    // Sprawdź czy klient istnieje
-    const existingClient = await db.queryRow`
-      SELECT id, first_name, last_name FROM clients WHERE id = ${req.id}
-    `;
-
-    if (!existingClient) {
-      throw APIError.notFound("Klient o podanym ID nie istnieje");
-    }
-
-    // Przygotuj dane do aktualizacji
-    const updateData: any = {};
-    
-    if (req.firstName !== undefined) {
-      updateData.first_name = req.firstName.trim();
-    }
-    if (req.lastName !== undefined) {
-      updateData.last_name = req.lastName.trim();
-    }
-    if (req.phone !== undefined) {
-      updateData.phone = req.phone ? req.phone.replace(/[\s-]/g, '') : null;
-    }
-    if (req.email !== undefined) {
-      updateData.email = req.email ? req.email.toLowerCase().trim() : null;
-    }
-    if (req.instagram !== undefined) {
-      updateData.instagram = req.instagram ? req.instagram.toLowerCase().trim() : null;
-    }
-    if (req.messenger !== undefined) {
-      updateData.messenger = req.messenger ? req.messenger.trim() : null;
-    }
-
-    // Sprawdź duplikaty telefonu
-    if (req.phone && updateData.phone) {
-      const duplicatePhone = await db.queryRow`
-        SELECT id, first_name, last_name FROM clients 
-        WHERE phone = ${updateData.phone} AND id != ${req.id}
-      `;
-
-      if (duplicatePhone) {
-        throw APIError.alreadyExists(
-          `Klient o takim telefonie już istnieje: ${duplicatePhone.first_name} ${duplicatePhone.last_name}`
-        );
-      }
-    }
-    
-    // Sprawdź duplikaty email
-    if (req.email && updateData.email) {
-      const duplicateEmail = await db.queryRow`
-        SELECT id, first_name, last_name FROM clients 
-        WHERE email = ${updateData.email} AND id != ${req.id}
-      `;
-
-      if (duplicateEmail) {
-        throw APIError.alreadyExists(
-          `Klient o takim emailu już istnieje: ${duplicateEmail.first_name} ${duplicateEmail.last_name}`
-        );
-      }
-    }
-
     try {
-      // Wykonaj aktualizację
-      let updatedClient;
-      
-      if (Object.keys(updateData).length > 0) {
-        // Buduj zapytanie dynamicznie na podstawie pól do aktualizacji
-        if (req.firstName !== undefined && req.lastName !== undefined && req.phone !== undefined && req.email !== undefined && req.instagram !== undefined && req.messenger !== undefined) {
-          updatedClient = await db.queryRow`
-            UPDATE clients 
-            SET 
-              first_name = ${updateData.first_name},
-              last_name = ${updateData.last_name},
-              phone = ${updateData.phone},
-              email = ${updateData.email},
-              instagram = ${updateData.instagram},
-              messenger = ${updateData.messenger}
-            WHERE id = ${req.id}
-            RETURNING 
-              id,
-              first_name as "firstName",
-              last_name as "lastName", 
-              phone,
-              email,
-              instagram,
-              messenger,
-              created_at as "createdAt",
-              NOW() as "updatedAt"
-          `;
-        } else {
-          // Dla pojedynczych pól - sprawdź które pole aktualizować
-          if (req.phone !== undefined) {
-            updatedClient = await db.queryRow`
-              UPDATE clients 
-              SET phone = ${updateData.phone}
-              WHERE id = ${req.id}
-              RETURNING 
-                id,
-                first_name as "firstName",
-                last_name as "lastName", 
-                phone,
-                email,
-                instagram,
-                messenger,
-                created_at as "createdAt",
-                NOW() as "updatedAt"
-            `;
-          } else if (req.email !== undefined) {
-            updatedClient = await db.queryRow`
-              UPDATE clients 
-              SET email = ${updateData.email}
-              WHERE id = ${req.id}
-              RETURNING 
-                id,
-                first_name as "firstName",
-                last_name as "lastName", 
-                phone,
-                email,
-                instagram,
-                messenger,
-                created_at as "createdAt",
-                NOW() as "updatedAt"
-            `;
-          } else if (req.instagram !== undefined) {
-            updatedClient = await db.queryRow`
-              UPDATE clients 
-              SET instagram = ${updateData.instagram}
-              WHERE id = ${req.id}
-              RETURNING 
-                id,
-                first_name as "firstName",
-                last_name as "lastName", 
-                phone,
-                email,
-                instagram,
-                messenger,
-                created_at as "createdAt",
-                NOW() as "updatedAt"
-            `;
-          } else if (req.messenger !== undefined) {
-            updatedClient = await db.queryRow`
-              UPDATE clients 
-              SET messenger = ${updateData.messenger}
-              WHERE id = ${req.id}
-              RETURNING 
-                id,
-                first_name as "firstName",
-                last_name as "lastName", 
-                phone,
-                email,
-                instagram,
-                messenger,
-                created_at as "createdAt",
-                NOW() as "updatedAt"
-            `;
-          }
+      if (!req.id || req.id <= 0) {
+        throw APIError.invalidArgument("Nieprawidłowe ID klienta");
+      }
+
+      if (req.firstName !== undefined && (!req.firstName || req.firstName.trim() === '')) {
+        throw APIError.invalidArgument("Imię nie może być puste");
+      }
+
+      if (req.lastName !== undefined && (!req.lastName || req.lastName.trim() === '')) {
+        throw APIError.invalidArgument("Nazwisko nie może być puste");
+      }
+
+      if (req.phone !== undefined && req.phone) {
+        const phoneRegex = /^(\+48|48)?[0-9]{9}$/;
+        const cleanPhone = req.phone.replace(/[\s-]/g, '');
+        if (!phoneRegex.test(cleanPhone)) {
+          throw APIError.invalidArgument("Nieprawidłowy format numeru telefonu");
         }
       }
 
-      if (!updatedClient) {
-        throw new Error("Failed to update client");
+      if (req.email !== undefined && req.email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(req.email)) {
+          throw APIError.invalidArgument("Nieprawidłowy format adresu email");
+        }
       }
-      
-      // Log successful update
-      logger.info('Client updated successfully', {
-        clientId: updatedClient.id,
-        clientName: `${updatedClient.firstName} ${updatedClient.lastName}`,
-        updatedFields: Object.keys(updateData)
-      });
-      
-      return { client: updatedClient as UpdateClientResponse['client'] };
-      
-    } catch (error) {
-      // Log error for debugging
-      logger.error('Error updating client', { 
-        error: error instanceof Error ? error.message : String(error), 
+
+      if (req.instagram !== undefined && req.instagram) {
+        const instagramRegex = /^[a-zA-Z0-9._]+$/;
+        if (!instagramRegex.test(req.instagram)) {
+          throw APIError.invalidArgument("Instagram może zawierać tylko litery, cyfry, kropki i podkreślenia");
+        }
+      }
+
+      // Check if client exists
+      const existingClient = await db.queryRow`
+        SELECT id FROM clients WHERE id = ${req.id}
+      `;
+
+      if (!existingClient) {
+        throw APIError.notFound("Klient nie został znaleziony");
+      }
+
+      // Check for duplicates
+      if (req.phone !== undefined && req.phone) {
+        const cleanPhone = req.phone.replace(/[\s-]/g, '');
+        const phoneDuplicate = await db.queryRow`
+          SELECT id FROM clients WHERE phone = ${cleanPhone} AND id != ${req.id}
+        `;
+        if (phoneDuplicate) {
+          throw APIError.alreadyExists("Klient z tym numerem telefonu już istnieje");
+        }
+      }
+
+      if (req.email !== undefined && req.email) {
+        const cleanEmail = req.email.toLowerCase().trim();
+        const emailDuplicate = await db.queryRow`
+          SELECT id FROM clients WHERE email = ${cleanEmail} AND id != ${req.id}
+        `;
+        if (emailDuplicate) {
+          throw APIError.alreadyExists("Klient z tym adresem email już istnieje");
+        }
+      }
+
+      // Build update query dynamically
+      const updates: string[] = [];
+      const hasFirstName = req.firstName !== undefined;
+      const hasLastName = req.lastName !== undefined;
+      const hasPhone = req.phone !== undefined;
+      const hasEmail = req.email !== undefined;
+      const hasInstagram = req.instagram !== undefined;
+      const hasMessenger = req.messenger !== undefined;
+
+      if (!hasFirstName && !hasLastName && !hasPhone && !hasEmail && !hasInstagram && !hasMessenger) {
+        throw APIError.invalidArgument("Brak danych do aktualizacji");
+      }
+
+      // Build the update query based on what fields are provided
+      if (hasFirstName) {
+        await db.exec`UPDATE clients SET first_name = ${req.firstName!.trim()}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+      }
+      if (hasLastName) {
+        await db.exec`UPDATE clients SET last_name = ${req.lastName!.trim()}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+      }
+      if (hasPhone) {
+        const cleanPhone = req.phone!.replace(/[\s-]/g, '');
+        await db.exec`UPDATE clients SET phone = ${cleanPhone}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+      }
+      if (hasEmail) {
+        const cleanEmail = req.email!.toLowerCase().trim();
+        await db.exec`UPDATE clients SET email = ${cleanEmail}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+      }
+      if (hasInstagram) {
+        const cleanInstagram = req.instagram!.toLowerCase().trim();
+        await db.exec`UPDATE clients SET instagram = ${cleanInstagram}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+      }
+      if (hasMessenger) {
+        await db.exec`UPDATE clients SET messenger = ${req.messenger!.trim()}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+      }
+
+      // Get the updated client
+      const updatedClient = await db.queryRow`
+        SELECT 
+          id, 
+          first_name as "firstName", 
+          last_name as "lastName", 
+          phone, 
+          email, 
+          instagram, 
+          messenger, 
+          birth_date as "birthDate", 
+          created_at as "createdAt", 
+          updated_at as "updatedAt", 
+          created_by as "createdBy"
+        FROM clients 
+        WHERE id = ${req.id}
+      `;
+
+      if (!updatedClient) {
+        throw APIError.internal("Nie udało się pobrać zaktualizowanego klienta");
+      }
+
+      logger.info("Client updated successfully", {
         clientId: req.id,
-        updateData
+        timestamp: new Date().toISOString()
       });
-      
-      // Return structured error response
+
+      return {
+        client: {
+          id: updatedClient.id,
+          firstName: updatedClient.firstName,
+          lastName: updatedClient.lastName,
+          phone: updatedClient.phone,
+          email: updatedClient.email,
+          instagram: updatedClient.instagram,
+          messenger: updatedClient.messenger,
+          birthDate: updatedClient.birthDate,
+          createdAt: updatedClient.createdAt,
+          updatedAt: updatedClient.updatedAt,
+          createdBy: updatedClient.createdBy
+        }
+      };
+
+    } catch (error) {
       if (error instanceof APIError) {
         throw error;
       }
-      
-      throw APIError.internal(`Błąd podczas aktualizacji klienta: ${error instanceof Error ? error.message : 'Nieznany błąd'}`);
+
+      logger.error("Error updating client", {
+        clientId: req.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
+
+      throw APIError.internal("Wystąpił błąd podczas aktualizacji klienta");
     }
   }
 );

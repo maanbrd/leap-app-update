@@ -12,6 +12,7 @@ export interface Client {
   email?: string;
   createdBy: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ListClientsResponse {
@@ -33,7 +34,8 @@ export const list = api<void, ListClientsResponse>(
         messenger, 
         email, 
         created_by as "createdBy", 
-        created_at as "createdAt"
+        created_at as "createdAt",
+        updated_at as "updatedAt"
       FROM clients
       ORDER BY created_at DESC
     `;

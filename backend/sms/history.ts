@@ -3,6 +3,7 @@ import db from "../db";
 
 export interface SMSHistoryItem {
   id: string;
+  clientId?: number;
   phone: string;
   message: string;
   messageId?: string;
@@ -12,6 +13,7 @@ export interface SMSHistoryItem {
   templateType?: string;
   cost?: number;
   sentAt: Date;
+  content?: string;
 }
 
 export interface GetSMSHistoryResponse {

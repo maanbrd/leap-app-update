@@ -203,7 +203,6 @@ export default function ClientList({ onNavigate }: ClientListProps) {
   };
 
   const handleClientUpdate = (updatedClient: Client) => {
-    // Update client in the list
     setClients(prevClients => 
       prevClients.map(client => 
         client.id === updatedClient.id ? updatedClient : client
@@ -506,7 +505,6 @@ export default function ClientList({ onNavigate }: ClientListProps) {
         client={selectedClient}
         isOpen={isModalOpen}
         onClose={closeModal}
-        onClientUpdate={handleClientUpdate}
       />
     </>
   );

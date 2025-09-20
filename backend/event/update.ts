@@ -1,6 +1,7 @@
-import { api, APIError } from "encore.dev/api";
+import { api } from "encore.dev/api";
+import { APIError } from "encore.dev/api";
 import db from "../db";
-import logger from '../utils/logger';
+import logger from "../utils/logger";
 
 export interface UpdateEventRequest {
   id: number;
@@ -25,158 +26,115 @@ export interface UpdateEventResponse {
   };
 }
 
-// Updates an existing event
 export const update = api<UpdateEventRequest, UpdateEventResponse>(
   { method: "PUT", path: "/events/:id", expose: true },
   async (req): Promise<UpdateEventResponse> => {
-    // Walidacja ID
-    if (!req.id || req.id <= 0) {
-      throw APIError.invalidArgument("Nieprawidłowe ID wizyty");
-    }
-
-    // Walidacja ceny
-    if (req.price !== undefined && (req.price <= 0 || !Number.isInteger(req.price))) {
-      throw APIError.invalidArgument("Cena musi być dodatnią liczbą całkowitą");
-    }
-
-    // Walidacja kwoty zadatku
-    if (req.depositAmount !== undefined && (req.depositAmount < 0 || !Number.isInteger(req.depositAmount))) {
-      throw APIError.invalidArgument("Kwota zadatku musi być nieujemną liczbą całkowitą");
-    }
-
-    // Walidacja statusu zadatku
-    if (req.depositStatus && !["zapłacony", "niezapłacony", "nie dotyczy"].includes(req.depositStatus)) {
-      throw APIError.invalidArgument("Nieprawidłowy status zadatku");
-    }
-
-    // Sprawdź czy wizyta istnieje
-    const existingEvent = await db.queryRow`
-      SELECT id, first_name, last_name, price, deposit_amount FROM events WHERE id = ${req.id}
-    `;
-
-    if (!existingEvent) {
-      throw APIError.notFound("Wizyta o podanym ID nie istnieje");
-    }
-
-    // Walidacja: zadatek nie może być większy od ceny
-    const finalPrice = req.price !== undefined ? req.price : existingEvent.price;
-    const finalDepositAmount = req.depositAmount !== undefined ? req.depositAmount : existingEvent.deposit_amount;
-    
-    if (finalDepositAmount > finalPrice) {
-      throw APIError.invalidArgument("Kwota zadatku nie może być większa od ceny wizyty");
-    }
-
     try {
-      // Wykonaj aktualizację
-      let updatedEvent;
-      
-      if (req.price !== undefined && req.depositAmount !== undefined && req.depositStatus !== undefined) {
-        // Wszystkie 3 pola
-        updatedEvent = await db.queryRow`
-          UPDATE events 
-          SET price = ${req.price}, deposit_amount = ${req.depositAmount}, deposit_status = ${req.depositStatus}
-          WHERE id = ${req.id}
-          RETURNING 
-            id,
-            first_name as "firstName",
-            last_name as "lastName",
-            event_time as "eventTime",
-            service,
-            price,
-            deposit_amount as "depositAmount",
-            deposit_status as "depositStatus",
-            duration_minutes as "durationMinutes",
-            created_at as "createdAt",
-            created_at as "updatedAt"
-        `;
-      } else if (req.price !== undefined) {
-        // Tylko cena
-        updatedEvent = await db.queryRow`
-          UPDATE events 
-          SET price = ${req.price}
-          WHERE id = ${req.id}
-          RETURNING 
-            id,
-            first_name as "firstName",
-            last_name as "lastName",
-            event_time as "eventTime",
-            service,
-            price,
-            deposit_amount as "depositAmount",
-            deposit_status as "depositStatus",
-            duration_minutes as "durationMinutes",
-            created_at as "createdAt",
-            created_at as "updatedAt"
-        `;
-      } else if (req.depositAmount !== undefined) {
-        // Tylko kwota zadatku
-        updatedEvent = await db.queryRow`
-          UPDATE events 
-          SET deposit_amount = ${req.depositAmount}
-          WHERE id = ${req.id}
-          RETURNING 
-            id,
-            first_name as "firstName",
-            last_name as "lastName",
-            event_time as "eventTime",
-            service,
-            price,
-            deposit_amount as "depositAmount",
-            deposit_status as "depositStatus",
-            duration_minutes as "durationMinutes",
-            created_at as "createdAt",
-            created_at as "updatedAt"
-        `;
-      } else if (req.depositStatus !== undefined) {
-        // Tylko status zadatku
-        updatedEvent = await db.queryRow`
-          UPDATE events 
-          SET deposit_status = ${req.depositStatus}
-          WHERE id = ${req.id}
-          RETURNING 
-            id,
-            first_name as "firstName",
-            last_name as "lastName",
-            event_time as "eventTime",
-            service,
-            price,
-            deposit_amount as "depositAmount",
-            deposit_status as "depositStatus",
-            duration_minutes as "durationMinutes",
-            created_at as "createdAt",
-            created_at as "updatedAt"
-        `;
-      } else {
-        throw APIError.invalidArgument("Brak danych do aktualizacji");
+      if (!req.id || req.id <= 0) {
+        throw APIError.invalidArgument("Nieprawidłowe ID wizyty");
       }
+
+      if (req.price !== undefined && (req.price < 0 || !Number.isInteger(req.price))) {
+        throw APIError.invalidArgument("Cena musi być liczbą całkowitą ≥ 0");
+      }
+
+      if (req.depositAmount !== undefined && (req.depositAmount < 0 || !Number.isInteger(req.depositAmount))) {
+        throw APIError.invalidArgument("Kwota zadatku musi być liczbą całkowitą ≥ 0");
+      }
+
+      if (req.depositStatus !== undefined && !['zapłacony', 'niezapłacony', 'nie dotyczy'].includes(req.depositStatus)) {
+        throw APIError.invalidArgument("Nieprawidłowy status płatności");
+      }
+
+      // Check if event exists and get current data
+      const existingEvent = await db.queryRow`
+        SELECT e.*, c.first_name, c.last_name 
+        FROM events e 
+        JOIN clients c ON e.client_id = c.id 
+        WHERE e.id = ${req.id}
+      `;
+
+      if (!existingEvent) {
+        throw APIError.notFound("Wizyta nie została znaleziona");
+      }
+
+      // Validate deposit amount vs price
+      const finalPrice = req.price !== undefined ? req.price : existingEvent.price;
+      const finalDepositAmount = req.depositAmount !== undefined ? req.depositAmount : existingEvent.deposit_amount;
+
+      if (finalDepositAmount > finalPrice) {
+        throw APIError.invalidArgument("Kwota zadatku nie może być większa od ceny wizyty");
+      }
+
+      // Update fields individually
+      if (req.price !== undefined) {
+        await db.exec`UPDATE events SET price = ${req.price}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+      }
+
+      if (req.depositAmount !== undefined) {
+        await db.exec`UPDATE events SET deposit_amount = ${req.depositAmount}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+      }
+
+      if (req.depositStatus !== undefined) {
+        await db.exec`UPDATE events SET deposit_status = ${req.depositStatus}, updated_at = ${new Date()} WHERE id = ${req.id}`;
+      }
+
+      // Get the updated event
+      const updatedEvent = await db.queryRow`
+        SELECT 
+          e.id,
+          c.first_name as "firstName",
+          c.last_name as "lastName",
+          e.event_time as "eventTime",
+          e.service,
+          e.price,
+          e.deposit_amount as "depositAmount",
+          e.deposit_status as "depositStatus",
+          e.duration_minutes as "durationMinutes",
+          e.created_at as "createdAt",
+          e.updated_at as "updatedAt"
+        FROM events e
+        JOIN clients c ON e.client_id = c.id
+        WHERE e.id = ${req.id}
+      `;
 
       if (!updatedEvent) {
-        throw new Error("Failed to update event");
+        throw APIError.internal("Nie udało się pobrać zaktualizowanej wizyty");
       }
-      
-      // Log successful update
-      logger.info('Event updated successfully', {
-        eventId: updatedEvent.id,
-        clientName: `${updatedEvent.firstName} ${updatedEvent.lastName}`,
-        updatedBy: 'user'
+
+      logger.info("Event updated successfully", {
+        eventId: req.id,
+        timestamp: new Date().toISOString()
       });
-      
-      return { event: updatedEvent as UpdateEventResponse['event'] };
-      
+
+      return {
+        event: {
+          id: updatedEvent.id,
+          firstName: updatedEvent.firstName,
+          lastName: updatedEvent.lastName,
+          eventTime: updatedEvent.eventTime,
+          service: updatedEvent.service,
+          price: updatedEvent.price,
+          depositAmount: updatedEvent.depositAmount,
+          depositStatus: updatedEvent.depositStatus,
+          durationMinutes: updatedEvent.durationMinutes,
+          createdAt: updatedEvent.createdAt,
+          updatedAt: updatedEvent.updatedAt
+        }
+      };
+
     } catch (error) {
-      // Log error for debugging
-      logger.error('Error updating event', { 
-        error: error instanceof Error ? error.message : String(error), 
-        stack: error instanceof Error ? error.stack : undefined,
-        eventId: req.id
-      });
-      
-      // Return structured error response
       if (error instanceof APIError) {
         throw error;
       }
-      
-      throw APIError.internal(`Błąd podczas aktualizacji wizyty: ${error instanceof Error ? error.message : 'Nieznany błąd'}`);
+
+      logger.error("Error updating event", {
+        eventId: req.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
+
+      throw APIError.internal("Wystąpił błąd podczas aktualizacji wizyty");
     }
   }
 );

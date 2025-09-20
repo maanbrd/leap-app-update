@@ -3,6 +3,7 @@ import db from "../db";
 
 export interface Event {
   id: number;
+  clientId: number;
   firstName: string;
   lastName: string;
   birthDate?: string;
@@ -32,26 +33,28 @@ export const list = api<void, ListEventsResponse>(
   async (): Promise<ListEventsResponse> => {
     const events = await db.queryAll<Event>`
       SELECT 
-        id,
-        first_name as "firstName",
-        last_name as "lastName", 
-        birth_date as "birthDate",
-        phone,
-        instagram,
-        messenger,
-        email,
-        event_time as "eventTime",
-        service,
-        price,
-        deposit_amount as "depositAmount",
-        deposit_due_date as "depositDueDate",
-        deposit_status as "depositStatus",
-        duration_minutes as "durationMinutes",
-        notes,
-        created_by as "createdBy",
-        created_at as "createdAt"
-      FROM events
-      ORDER BY event_time ASC
+        e.id,
+        e.client_id as "clientId",
+        c.first_name as "firstName",
+        c.last_name as "lastName", 
+        c.birth_date as "birthDate",
+        c.phone,
+        c.instagram,
+        c.messenger,
+        c.email,
+        e.event_time as "eventTime",
+        e.service,
+        e.price,
+        e.deposit_amount as "depositAmount",
+        e.deposit_due_date as "depositDueDate",
+        e.deposit_status as "depositStatus",
+        e.duration_minutes as "durationMinutes",
+        e.notes,
+        e.created_by as "createdBy",
+        e.created_at as "createdAt"
+      FROM events e
+      JOIN clients c ON e.client_id = c.id
+      ORDER BY e.event_time ASC
     `;
 
     return { events };

@@ -1,24 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { X, Phone, Mail, Instagram, MessageCircle, Edit3, Save, Calendar, DollarSign, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
-import { 
-  X, 
-  Phone, 
-  Mail, 
-  Instagram, 
-  MessageCircle, 
-  Calendar, 
-  MessageSquare,
-  Edit3,
-  Save,
-  X as XIcon,
-  Loader2
-} from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 import backend from '~backend/client';
 import type { Client } from '~backend/client/list';
 import type { Event } from '~backend/event/list';
@@ -28,167 +15,156 @@ interface ClientDetailModalProps {
   client: Client | null;
   isOpen: boolean;
   onClose: () => void;
-  onClientUpdate: (updatedClient: Client) => void;
 }
 
-type DepositStatus = "zapłacony" | "niezapłacony" | "nie dotyczy";
-
-export default function ClientDetailModal({ 
-  client, 
-  isOpen, 
-  onClose, 
-  onClientUpdate 
-}: ClientDetailModalProps) {
-  const [editingField, setEditingField] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [loading, setLoading] = useState(false);
+export default function ClientDetailModal({ client, isOpen, onClose }: ClientDetailModalProps) {
+  const [clientData, setClientData] = useState<Client | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [smsHistory, setSmsHistory] = useState<SMSHistoryItem[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
-  const [smsLoading, setSmsLoading] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  
+  // Client editing states
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [editStatus, setEditStatus] = useState<string>('');
 
-  // Event editing state
+  // Event editing states
   const [editingEvent, setEditingEvent] = useState<number | null>(null);
   const [editingEventField, setEditingEventField] = useState<string | null>(null);
   const [eventEditValue, setEventEditValue] = useState('');
   const [eventLoading, setEventLoading] = useState(false);
 
-  // Pobierz historię wizyt i SMS-ów
   useEffect(() => {
     if (client && isOpen) {
+      setClientData(client);
       fetchClientHistory();
     }
   }, [client, isOpen]);
 
   const fetchClientHistory = async () => {
     if (!client) return;
-
-    // Pobierz ostatnie 10 wizyt
-    setEventsLoading(true);
-    try {
-      const eventsResponse = await backend.event.list();
-      const clientEvents = eventsResponse.events
-        ?.filter(event => 
-          event.firstName === client.firstName && 
-          event.lastName === client.lastName
-        )
-        .slice(0, 10) || [];
-      setEvents(clientEvents);
-    } catch (error) {
-      console.error('Error fetching events:', error);
-    } finally {
-      setEventsLoading(false);
-    }
-
-    // Pobierz ostatnie 10 SMS-ów
-    setSmsLoading(true);
-    try {
-      const smsResponse = await backend.sms.getSMSHistory();
-      const clientSms = smsResponse.history
-        ?.filter(sms => sms.phone === client.phone)
-        .slice(0, 10) || [];
-      setSmsHistory(clientSms);
-    } catch (error) {
-      console.error('Error fetching SMS history:', error);
-    } finally {
-      setSmsLoading(false);
-    }
-  };
-
-  // Client editing functions with enhanced validation
-  const validateField = (field: string, value: string): string | null => {
-    if (!value.trim()) return null; // Allow empty values
     
-    switch (field) {
-      case 'phone':
-        // Polish phone number validation
-        const phoneRegex = /^(\+48|48)?[\s-]?[0-9]{3}[\s-]?[0-9]{3}[\s-]?[0-9]{3}$/;
-        if (!phoneRegex.test(value)) {
-          return 'Nieprawidłowy format numeru telefonu (np. +48 123 456 789)';
-        }
-        break;
-      case 'email':
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(value)) {
-          return 'Nieprawidłowy format adresu email';
-        }
-        break;
-      case 'instagram':
-        const instaRegex = /^[a-zA-Z0-9._]{1,30}$/;
-        if (!instaRegex.test(value)) {
-          return 'Instagram może zawierać tylko litery, cyfry, kropki i podkreślenia (max 30 znaków)';
-        }
-        break;
-    }
-    return null;
-  };
-  
-  const startEditing = (field: string, currentValue: string) => {
-    setEditingField(field);
-    setEditValue(currentValue || '');
-    setValidationError(null);
-  };
-
-  const cancelEditing = () => {
-    setEditingField(null);
-    setEditValue('');
-    setValidationError(null);
-  };
-
-  const saveField = async () => {
-    if (!client || !editingField) return;
-
-    // Validate field
-    const error = validateField(editingField, editValue);
-    if (error) {
-      setValidationError(error);
-      toast({
-        title: "Błąd walidacji",
-        description: error,
-        variant: "destructive"
-      });
-      return;
-    }
-
     setLoading(true);
     try {
-      const response = await backend.client.update({
-        id: client.id,
-        [editingField]: editValue.trim()
-      });
-      
-      // Update local state with merged data
-      const updatedClientWithMissingFields = {
-        ...client,
-        ...response.client
-      };
-      onClientUpdate(updatedClientWithMissingFields);
-      
-      toast({
-        title: "Sukces",
-        description: "Dane klienta zostały zaktualizowane"
-      });
-      
-      setEditingField(null);
-      setEditValue('');
-      setValidationError(null);
-      
-    } catch (error: any) {
-      console.error('Error updating client:', error);
-      
+      // Fetch events
+      const eventsResponse = await backend.event.list();
+      const clientEvents = eventsResponse.events.filter(event => 
+        event.clientId === client.id
+      ).slice(0, 10);
+      setEvents(clientEvents);
+
+      // Fetch SMS history
+      const smsResponse = await backend.sms.getSMSHistory();
+      const clientSms = smsResponse.history.filter(sms => 
+        sms.clientId === client.id
+      ).slice(0, 10);
+      setSmsHistory(clientSms);
+    } catch (error) {
+      console.error('Error fetching client history:', error);
       toast({
         title: "Błąd",
-        description: error.message || "Nie udało się zaktualizować danych klienta",
-        variant: "destructive"
+        description: "Nie udało się załadować historii klienta",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // Event editing functions
+  const startEditing = (field: string, currentValue: string) => {
+    setEditingField(field);
+    setEditValue(currentValue || '');
+    setEditStatus('');
+  };
+
+  const cancelEditing = () => {
+    setEditingField(null);
+    setEditValue('');
+    setEditStatus('');
+  };
+
+  const saveField = async () => {
+    if (!clientData || !editingField) return;
+
+    setSaving(true);
+    try {
+      const updateData: any = { id: clientData.id };
+      
+      switch (editingField) {
+        case 'phone':
+          if (editValue && !/^(\+48|48)?[0-9]{9}$/.test(editValue.replace(/[\s-]/g, ''))) {
+            setEditStatus('error');
+            toast({
+              title: "Błąd walidacji",
+              description: "Nieprawidłowy format numeru telefonu",
+              variant: "destructive",
+            });
+            return;
+          }
+          updateData.phone = editValue;
+          break;
+        case 'email':
+          if (editValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editValue)) {
+            setEditStatus('error');
+            toast({
+              title: "Błąd walidacji",
+              description: "Nieprawidłowy format adresu email",
+              variant: "destructive",
+            });
+            return;
+          }
+          updateData.email = editValue;
+          break;
+        case 'instagram':
+          if (editValue && !/^[a-zA-Z0-9._]+$/.test(editValue)) {
+            setEditStatus('error');
+            toast({
+              title: "Błąd walidacji",
+              description: "Instagram może zawierać tylko litery, cyfry, kropki i podkreślenia",
+              variant: "destructive",
+            });
+            return;
+          }
+          updateData.instagram = editValue;
+          break;
+        case 'messenger':
+          updateData.messenger = editValue;
+          break;
+      }
+
+      const response = await backend.client.update(updateData);
+      
+      // Convert Date to string to match Client interface
+      const updatedClient = {
+        ...response.client,
+        birthDate: response.client.birthDate?.toISOString().split('T')[0]
+      };
+      setClientData(updatedClient);
+      setEditStatus('success');
+      
+      toast({
+        title: "Sukces",
+        description: "Dane klienta zostały zaktualizowane",
+      });
+
+      setTimeout(() => {
+        cancelEditing();
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error updating client:', error);
+      setEditStatus('error');
+      toast({
+        title: "Błąd",
+        description: "Nie udało się zaktualizować danych klienta",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const startEditingEvent = (eventId: number, field: string, currentValue: any) => {
     setEditingEvent(eventId);
     setEditingEventField(field);
@@ -207,106 +183,89 @@ export default function ClientDetailModal({
     setEventLoading(true);
     try {
       const updateData: any = { id: editingEvent };
-      const currentEvent = events.find(e => e.id === editingEvent);
       
-      // Enhanced validation with business logic
       switch (editingEventField) {
         case 'price':
           const price = parseInt(eventEditValue);
           if (isNaN(price) || price < 0) {
             toast({
               title: "Błąd walidacji",
-              description: "Cena musi być liczbą całkowitą większą lub równą 0",
-              variant: "destructive"
-            });
-            return;
-          }
-          // Check if new price is less than current deposit
-          if (currentEvent?.depositAmount && price < currentEvent.depositAmount) {
-            toast({
-              title: "Błąd walidacji", 
-              description: `Cena (${price} zł) nie może być mniejsza od zadatku (${currentEvent.depositAmount} zł)`,
-              variant: "destructive"
+              description: "Cena musi być liczbą całkowitą ≥ 0",
+              variant: "destructive",
             });
             return;
           }
           updateData.price = price;
           break;
-          
         case 'depositAmount':
           const depositAmount = parseInt(eventEditValue);
           if (isNaN(depositAmount) || depositAmount < 0) {
             toast({
               title: "Błąd walidacji",
-              description: "Kwota zadatku musi być liczbą całkowitą większą lub równą 0",
-              variant: "destructive"
+              description: "Kwota zadatku musi być liczbą całkowitą ≥ 0",
+              variant: "destructive",
             });
             return;
           }
-          // Check if deposit amount is greater than price
+          const currentEvent = events.find(e => e.id === editingEvent);
           if (currentEvent && depositAmount > currentEvent.price) {
             toast({
               title: "Błąd walidacji",
-              description: `Zadatek (${depositAmount} zł) nie może być większy od ceny wizyty (${currentEvent.price} zł)`,
-              variant: "destructive"
+              description: "Kwota zadatku nie może być większa od ceny wizyty",
+              variant: "destructive",
             });
             return;
           }
           updateData.depositAmount = depositAmount;
           break;
-          
         case 'depositStatus':
           if (!['zapłacony', 'niezapłacony', 'nie dotyczy'].includes(eventEditValue)) {
             toast({
               title: "Błąd walidacji",
               description: "Nieprawidłowy status płatności",
-              variant: "destructive"
+              variant: "destructive",
             });
             return;
           }
           updateData.depositStatus = eventEditValue;
           break;
-          
-        default:
-          updateData[editingEventField] = eventEditValue;
       }
 
       const response = await backend.event.update(updateData);
       
-      // Update events list
-      setEvents(prevEvents => 
-        prevEvents.map(event => 
-          event.id === editingEvent ? { ...event, ...response.event } : event
-        )
-      );
+      setEvents(events.map(event => 
+        event.id === editingEvent 
+          ? { ...event, ...response.event }
+          : event
+      ));
       
       toast({
         title: "Sukces",
-        description: "Dane wizyty zostały zaktualizowane"
+        description: "Dane wizyty zostały zaktualizowane",
       });
-      
-      setEditingEvent(null);
-      setEditingEventField(null);
-      setEventEditValue('');
-      
-    } catch (error: any) {
+
+      setTimeout(() => {
+        cancelEditingEvent();
+      }, 1000);
+
+    } catch (error) {
       console.error('Error updating event:', error);
-      
       toast({
         title: "Błąd",
-        description: error.message || "Nie udało się zaktualizować danych wizyty",
-        variant: "destructive"
+        description: "Nie udało się zaktualizować danych wizyty",
+        variant: "destructive",
       });
     } finally {
       setEventLoading(false);
     }
   };
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('pl-PL', {
-      day: '2-digit',
-      month: '2-digit',
+  const formatDate = (dateString: string | Date) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pl-PL', {
       year: 'numeric',
+      month: 'short',
+      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -316,516 +275,336 @@ export default function ClientDetailModal({
     return `${price} zł`;
   };
 
-  const getDepositStatusColor = (status: string) => {
-    switch (status) {
-      case 'zapłacony': return 'bg-green-100 text-green-800';
-      case 'niezapłacony': return 'bg-red-100 text-red-800';
-      case 'nie dotyczy': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  if (!isOpen || !client) return null;
+  if (!isOpen || !clientData) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-background rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
+      <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         <div className="flex justify-between items-center p-6 border-b">
-          <div>
-            <h2 className="text-2xl font-bold">
-              {client.firstName} {client.lastName}
-            </h2>
-            <p className="text-muted-foreground">
-              Szczegóły klienta
-            </p>
-          </div>
+          <h2 className="text-2xl font-bold">
+            📁 {clientData.firstName} {clientData.lastName}
+          </h2>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* Left Column - Client Details */}
             <div className="space-y-6">
+              
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Edit3 className="h-5 w-5" />
+                    <Edit3 className="h-4 w-4" />
                     Dane osobowe
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Phone */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      Telefon
-                    </label>
-                    {editingField === 'phone' ? (
-                      <div className="flex gap-2">
-                        <div className="flex-1">
+                  
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex-1">
+                      {editingField === 'phone' ? (
+                        <div className="flex gap-2">
                           <Input
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
-                            placeholder="+48 123 456 789"
-                            disabled={loading}
-                            className={validationError && editingField === 'phone' ? 'border-red-500' : ''}
+                            placeholder="Numer telefonu"
+                            className={editStatus === 'error' ? 'border-red-500' : ''}
                           />
-                          {validationError && editingField === 'phone' && (
-                            <p className="text-xs text-red-500 mt-1">{validationError}</p>
-                          )}
+                          <Button size="sm" onClick={saveField} disabled={saving}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEditing}>
+                            <X className="h-3 w-3" />
+                          </Button>
                         </div>
-                        <Button 
-                          size="sm" 
-                          onClick={saveField} 
-                          disabled={loading}
+                      ) : (
+                        <div 
+                          className="cursor-pointer hover:bg-muted p-2 rounded"
+                          onClick={() => startEditing('phone', clientData.phone || '')}
                         >
-                          {loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={cancelEditing}
-                          disabled={loading}
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div 
-                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer transition-colors"
-                        onClick={() => startEditing('phone', client.phone || '')}
-                      >
-                        <span>{client.phone || 'Brak numeru'}</span>
-                        <Edit3 className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
+                          {clientData.phone || 'Brak numeru'}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Email */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      Email
-                    </label>
-                    {editingField === 'email' ? (
-                      <div className="flex gap-2">
-                        <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex-1">
+                      {editingField === 'email' ? (
+                        <div className="flex gap-2">
                           <Input
-                            type="email"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
-                            placeholder="email@example.com"
-                            disabled={loading}
-                            className={validationError && editingField === 'email' ? 'border-red-500' : ''}
+                            placeholder="Adres email"
+                            className={editStatus === 'error' ? 'border-red-500' : ''}
                           />
-                          {validationError && editingField === 'email' && (
-                            <p className="text-xs text-red-500 mt-1">{validationError}</p>
-                          )}
+                          <Button size="sm" onClick={saveField} disabled={saving}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEditing}>
+                            <X className="h-3 w-3" />
+                          </Button>
                         </div>
-                        <Button 
-                          size="sm" 
-                          onClick={saveField} 
-                          disabled={loading}
+                      ) : (
+                        <div 
+                          className="cursor-pointer hover:bg-muted p-2 rounded"
+                          onClick={() => startEditing('email', clientData.email || '')}
                         >
-                          {loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={cancelEditing}
-                          disabled={loading}
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div 
-                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer transition-colors"
-                        onClick={() => startEditing('email', client.email || '')}
-                      >
-                        <span>{client.email || 'Brak email'}</span>
-                        <Edit3 className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
+                          {clientData.email || 'Brak email'}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Instagram */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <Instagram className="h-4 w-4" />
-                      Instagram
-                    </label>
-                    {editingField === 'instagram' ? (
-                      <div className="flex gap-2">
-                        <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <Instagram className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex-1">
+                      {editingField === 'instagram' ? (
+                        <div className="flex gap-2">
                           <Input
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
-                            placeholder="username (bez @)"
-                            disabled={loading}
-                            className={validationError && editingField === 'instagram' ? 'border-red-500' : ''}
+                            placeholder="Instagram"
+                            className={editStatus === 'error' ? 'border-red-500' : ''}
                           />
-                          {validationError && editingField === 'instagram' && (
-                            <p className="text-xs text-red-500 mt-1">{validationError}</p>
-                          )}
+                          <Button size="sm" onClick={saveField} disabled={saving}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEditing}>
+                            <X className="h-3 w-3" />
+                          </Button>
                         </div>
-                        <Button 
-                          size="sm" 
-                          onClick={saveField} 
-                          disabled={loading}
+                      ) : (
+                        <div 
+                          className="cursor-pointer hover:bg-muted p-2 rounded"
+                          onClick={() => startEditing('instagram', clientData.instagram || '')}
                         >
-                          {loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={cancelEditing}
-                          disabled={loading}
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div 
-                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer transition-colors"
-                        onClick={() => startEditing('instagram', client.instagram || '')}
-                      >
-                        <span>{client.instagram ? `@${client.instagram}` : 'Brak Instagram'}</span>
-                        <Edit3 className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
+                          {clientData.instagram || 'Brak Instagram'}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Messenger */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <MessageCircle className="h-4 w-4" />
-                      Messenger
-                    </label>
-                    {editingField === 'messenger' ? (
-                      <div className="flex gap-2">
-                        <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex-1">
+                      {editingField === 'messenger' ? (
+                        <div className="flex gap-2">
                           <Input
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
-                            placeholder="Messenger username"
-                            disabled={loading}
-                            className={validationError && editingField === 'messenger' ? 'border-red-500' : ''}
+                            placeholder="Messenger"
+                            className={editStatus === 'error' ? 'border-red-500' : ''}
                           />
-                          {validationError && editingField === 'messenger' && (
-                            <p className="text-xs text-red-500 mt-1">{validationError}</p>
-                          )}
+                          <Button size="sm" onClick={saveField} disabled={saving}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEditing}>
+                            <X className="h-3 w-3" />
+                          </Button>
                         </div>
-                        <Button 
-                          size="sm" 
-                          onClick={saveField} 
-                          disabled={loading}
+                      ) : (
+                        <div 
+                          className="cursor-pointer hover:bg-muted p-2 rounded"
+                          onClick={() => startEditing('messenger', clientData.messenger || '')}
                         >
-                          {loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={cancelEditing}
-                          disabled={loading}
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div 
-                        className="flex items-center justify-between p-2 border rounded hover:bg-muted cursor-pointer transition-colors"
-                        onClick={() => startEditing('messenger', client.messenger || '')}
-                      >
-                        <span>{client.messenger || 'Brak Messenger'}</span>
-                        <Edit3 className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
+                          {clientData.messenger || 'Brak Messenger'}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {clientData.birthDate && (
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span>{formatDate(clientData.birthDate)}</span>
+                    </div>
+                  )}
+
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Informacje systemowe</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="text-sm">
+                    <strong>Utworzony:</strong> {formatDate(clientData.createdAt)}
+                  </p>
+                  <p className="text-sm">
+                    <strong>Utworzony przez:</strong> {clientData.createdBy}
+                  </p>
+                  <p className="text-sm">
+                    <strong>Ostatnia aktualizacja:</strong> {formatDate(clientData.updatedAt)}
+                  </p>
+                </CardContent>
+              </Card>
+
             </div>
 
-            {/* Right Column - History */}
             <div className="space-y-6">
               
-              {/* Events History */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Ostatnie wizyty (10)
+                    <Calendar className="h-4 w-4" />
+                    Ostatnie wizyty
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {eventsLoading ? (
-                    <div className="text-center py-4">Ładowanie wizyt...</div>
-                  ) : events.length > 0 ? (
+                  {loading ? (
+                    <p className="text-center text-muted-foreground">Ładowanie wizyt...</p>
+                  ) : events.length === 0 ? (
+                    <p className="text-center text-muted-foreground">Brak wizyt</p>
+                  ) : (
                     <div className="space-y-3">
                       {events.map((event) => (
-                        <div key={event.id} className="p-3 border rounded">
+                        <div key={event.id} className="border rounded-lg p-3">
                           <div className="flex justify-between items-start mb-2">
                             <div>
-                              <div className="font-medium">{event.service}</div>
-                              <div className="text-sm text-muted-foreground">
+                              <p className="font-medium">{event.service}</p>
+                              <p className="text-sm text-muted-foreground">
                                 {formatDate(event.eventTime)}
-                              </div>
+                              </p>
                             </div>
-                          </div>
-                          
-                          {/* Editable Fields */}
-                          <div className="space-y-2">
-                            {/* Price */}
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium">Cena:</span>
-                              {editingEvent === event.id && editingEventField === 'price' ? (
-                                <div className="flex gap-2 items-center">
-                                  <div className="flex flex-col">
-                                    <div className="flex gap-1 items-center">
-                                      <Input
-                                        type="number"
-                                        value={eventEditValue}
-                                        onChange={(e) => setEventEditValue(e.target.value)}
-                                        placeholder="0"
-                                        className="w-20 text-xs"
-                                        disabled={eventLoading}
-                                        min="0"
-                                      />
-                                      <span className="text-xs">zł</span>
-                                    </div>
-                                    {event.depositAmount && parseInt(eventEditValue) < event.depositAmount && (
-                                      <span className="text-xs text-red-500 mt-1">
-                                        Min: {event.depositAmount} zł (zadatek)
-                                      </span>
-                                    )}
-                                  </div>
-                                  <Button 
-                                    size="sm" 
-                                    onClick={saveEventField} 
-                                    disabled={eventLoading}
-                                  >
-                                    {eventLoading ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <Save className="h-3 w-3" />
-                                    )}
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    onClick={cancelEditingEvent}
-                                    disabled={eventLoading}
-                                  >
-                                    <XIcon className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div 
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded transition-colors"
-                                  onClick={() => startEditingEvent(event.id, 'price', event.price)}
-                                  title="Kliknij aby edytować cenę"
-                                >
-                                  <span className="text-sm font-medium text-green-700">{formatPrice(event.price)}</span>
-                                  <Edit3 className="h-3 w-3 text-muted-foreground" />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Deposit Amount */}
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium">Zadatek:</span>
-                              {editingEvent === event.id && editingEventField === 'depositAmount' ? (
-                                <div className="flex gap-2 items-center">
-                                  <div className="flex flex-col">
-                                    <div className="flex gap-1 items-center">
-                                      <Input
-                                        type="number"
-                                        value={eventEditValue}
-                                        onChange={(e) => setEventEditValue(e.target.value)}
-                                        placeholder="0"
-                                        className="w-20 text-xs"
-                                        disabled={eventLoading}
-                                        min="0"
-                                        max={event.price}
-                                      />
-                                      <span className="text-xs">zł</span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground mt-1">
-                                      Max: {event.price} zł
-                                    </span>
-                                    {parseInt(eventEditValue) > event.price && (
-                                      <span className="text-xs text-red-500">
-                                        Przekracza cenę wizyty!
-                                      </span>
-                                    )}
-                                  </div>
-                                  <Button 
-                                    size="sm" 
-                                    onClick={saveEventField} 
-                                    disabled={eventLoading}
-                                  >
-                                    {eventLoading ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <Save className="h-3 w-3" />
-                                    )}
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    onClick={cancelEditingEvent}
-                                    disabled={eventLoading}
-                                  >
-                                    <XIcon className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div 
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded transition-colors"
-                                  onClick={() => startEditingEvent(event.id, 'depositAmount', event.depositAmount || 0)}
-                                  title="Kliknij aby edytować zadatek"
-                                >
-                                  <span className="text-sm font-medium text-blue-700">{formatPrice(event.depositAmount || 0)}</span>
-                                  <Edit3 className="h-3 w-3 text-muted-foreground" />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Deposit Status */}
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium">Status zadatku:</span>
+                            <div className="flex items-center gap-2">
                               {editingEvent === event.id && editingEventField === 'depositStatus' ? (
-                                <div className="flex gap-2">
+                                <div className="flex gap-1">
                                   <Select value={eventEditValue} onValueChange={setEventEditValue}>
-                                    <SelectTrigger className="w-32 text-xs">
+                                    <SelectTrigger className="w-32 h-6 text-xs">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="zapłacony">✅ Zapłacony</SelectItem>
-                                      <SelectItem value="niezapłacony">❌ Niezapłacony</SelectItem>
-                                      <SelectItem value="nie dotyczy">➖ Nie dotyczy</SelectItem>
+                                      <SelectItem value="zapłacony">Zapłacony</SelectItem>
+                                      <SelectItem value="niezapłacony">Niezapłacony</SelectItem>
+                                      <SelectItem value="nie dotyczy">Nie dotyczy</SelectItem>
                                     </SelectContent>
                                   </Select>
-                                  <Button 
-                                    size="sm" 
-                                    onClick={saveEventField} 
-                                    disabled={eventLoading}
-                                  >
-                                    {eventLoading ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <Save className="h-3 w-3" />
-                                    )}
+                                  <Button size="sm" onClick={saveEventField} disabled={eventLoading}>
+                                    <Save className="h-3 w-3" />
                                   </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    onClick={cancelEditingEvent}
-                                    disabled={eventLoading}
-                                  >
-                                    <XIcon className="h-3 w-3" />
+                                  <Button size="sm" variant="outline" onClick={cancelEditingEvent}>
+                                    <X className="h-3 w-3" />
                                   </Button>
                                 </div>
                               ) : (
-                                <div 
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded transition-colors"
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs cursor-pointer hover:bg-muted"
                                   onClick={() => startEditingEvent(event.id, 'depositStatus', event.depositStatus)}
-                                  title="Kliknij aby zmienić status płatności"
                                 >
-                                  <Badge className={getDepositStatusColor(event.depositStatus)}>
-                                    {event.depositStatus}
-                                  </Badge>
-                                  <Edit3 className="h-3 w-3 text-muted-foreground" />
-                                </div>
+                                  {event.depositStatus}
+                                </Badge>
                               )}
                             </div>
                           </div>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-3 w-3" />
+                              {editingEvent === event.id && editingEventField === 'price' ? (
+                                <div className="flex gap-1">
+                                  <Input
+                                    value={eventEditValue}
+                                    onChange={(e) => setEventEditValue(e.target.value)}
+                                    placeholder="Cena"
+                                    className="w-20 h-6 text-xs"
+                                  />
+                                  <Button size="sm" onClick={saveEventField} disabled={eventLoading}>
+                                    <Save className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={cancelEditingEvent}>
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span 
+                                  className="text-sm cursor-pointer hover:bg-muted p-1 rounded"
+                                  onClick={() => startEditingEvent(event.id, 'price', event.price)}
+                                >
+                                  {formatPrice(event.price)}
+                                </span>
+                              )}
+                            </div>
+                            {event.depositAmount && (
+                              <div className="text-sm text-muted-foreground">
+                                {editingEvent === event.id && editingEventField === 'depositAmount' ? (
+                                  <div className="flex gap-1">
+                                    <Input
+                                      value={eventEditValue}
+                                      onChange={(e) => setEventEditValue(e.target.value)}
+                                      placeholder="Zadatek"
+                                      className="w-20 h-6 text-xs"
+                                    />
+                                    <Button size="sm" onClick={saveEventField} disabled={eventLoading}>
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={cancelEditingEvent}>
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <span 
+                                    className="cursor-pointer hover:bg-muted p-1 rounded"
+                                    onClick={() => startEditingEvent(event.id, 'depositAmount', event.depositAmount)}
+                                  >
+                                    Zadatek: {formatPrice(event.depositAmount)}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-muted-foreground">
-                      Brak wizyt
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* SMS History */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" />
-                    Ostatnie SMS-y (10)
+                    <MessageSquare className="h-4 w-4" />
+                    Ostatnie SMS-y
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {smsLoading ? (
-                    <div className="text-center py-4">Ładowanie SMS-ów...</div>
-                  ) : smsHistory.length > 0 ? (
+                  {loading ? (
+                    <p className="text-center text-muted-foreground">Ładowanie SMS-ów...</p>
+                  ) : smsHistory.length === 0 ? (
+                    <p className="text-center text-muted-foreground">Brak SMS-ów</p>
+                  ) : (
                     <div className="space-y-3">
                       {smsHistory.map((sms) => (
-                        <div key={sms.id} className="p-3 border rounded">
+                        <div key={sms.id} className="border rounded-lg p-3">
                           <div className="flex justify-between items-start mb-2">
-                            <div className="text-sm text-muted-foreground">
-                              {formatDate(sms.sentAt)}
-                            </div>
-                            <Badge 
-                              variant={sms.status === 'sent' ? 'default' : 'destructive'}
-                              className="text-xs"
-                            >
+                            <p className="text-sm font-medium">{sms.templateType}</p>
+                            <Badge variant="outline" className="text-xs">
                               {sms.status}
                             </Badge>
                           </div>
-                          <div className="text-sm">
-                            {sms.message.length > 100 
-                              ? `${sms.message.substring(0, 100)}...` 
-                              : sms.message
-                            }
-                          </div>
-                          {sms.templateType && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Szablon: {sms.templateType}
-                            </div>
-                          )}
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {formatDate(sms.sentAt)}
+                          </p>
+                          <p className="text-sm">{sms.content || sms.message}</p>
                         </div>
                       ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-muted-foreground">
-                      Brak SMS-ów
                     </div>
                   )}
                 </CardContent>
               </Card>
+
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-2 p-6 border-t">
-          <Button variant="outline" onClick={onClose}>
+        <div className="flex justify-end p-6 border-t">
+          <Button onClick={onClose}>
             Zamknij
           </Button>
         </div>
