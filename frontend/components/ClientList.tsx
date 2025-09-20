@@ -62,17 +62,35 @@ export default function ClientList({ onNavigate }: ClientListProps) {
       .replace(/ż/g, 'z');
   };
 
-  // Determine client status based on business logic
+  // Enhanced business logic for determining client status
   const getClientStatus = (client: Client): ClientStatus => {
-    // TODO: Implement business logic based on:
-    // - Last visit date
-    // - Number of visits
-    // - Payment status
-    // - Manual status override
+    const now = new Date();
+    const clientCreatedAt = new Date(client.createdAt);
+    const daysSinceCreation = Math.floor((now.getTime() - clientCreatedAt.getTime()) / (1000 * 60 * 60 * 24));
     
-    // For now, return 'nowy' for all clients
-    // This should be replaced with actual business logic
-    return 'nowy';
+    // Find client's events to determine activity
+    const clientEvents = clients.length > 0 ? [] : []; // Will be populated when we have events data
+    
+    // Status logic:
+    // 1. Nowy: Client created within last 30 days and has 0-1 visits
+    // 2. Aktywny: Client has visits within last 90 days
+    // 3. Nieaktywny: Client has no visits in last 90+ days but has some visits
+    // 4. Zbanowany: Manual override (would need to be stored in DB)
+    
+    // For now, simplified logic based on creation date
+    if (daysSinceCreation <= 30) {
+      return 'nowy';
+    } else if (daysSinceCreation <= 90) {
+      return 'aktywny';
+    } else {
+      return 'nieaktywny';
+    }
+    
+    // TODO: Implement full logic when event data is integrated:
+    // - Check last visit date
+    // - Count total visits
+    // - Check payment history
+    // - Check for manual status override in client record
   };
 
   // Sort clients with Polish collation
@@ -264,7 +282,7 @@ export default function ClientList({ onNavigate }: ClientListProps) {
     <>
       <div className="min-h-screen bg-background p-8">
         <div className="max-w-6xl mx-auto">
-          {/* Header */}
+          {/* Header with Status Counters */}
           <div className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold">Klienci</h1>
@@ -272,6 +290,22 @@ export default function ClientList({ onNavigate }: ClientListProps) {
                 {filteredClients.length} klientów
                 {statusFilter !== 'all' && ` (${getStatusLabel(statusFilter as ClientStatus)})`}
               </p>
+              
+              {/* Status Counters */}
+              <div className="flex gap-2 mt-3">
+                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                  Nowy: {clients.filter(c => getClientStatus(c) === 'nowy').length}
+                </Badge>
+                <Badge variant="outline" className="bg-green-50 text-green-700">
+                  Aktywny: {clients.filter(c => getClientStatus(c) === 'aktywny').length}
+                </Badge>
+                <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
+                  Nieaktywny: {clients.filter(c => getClientStatus(c) === 'nieaktywny').length}
+                </Badge>
+                <Badge variant="outline" className="bg-red-50 text-red-700">
+                  Zbanowany: {clients.filter(c => getClientStatus(c) === 'zbanowany').length}
+                </Badge>
+              </div>
             </div>
             <Button variant="outline" onClick={() => onNavigate('menu')}>
               ← Menu główne
@@ -299,11 +333,19 @@ export default function ClientList({ onNavigate }: ClientListProps) {
                     <SelectValue placeholder="Filtruj status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Wszyscy klienci</SelectItem>
-                    <SelectItem value="nowy">Nowy</SelectItem>
-                    <SelectItem value="aktywny">Aktywny</SelectItem>
-                    <SelectItem value="nieaktywny">Nieaktywny</SelectItem>
-                    <SelectItem value="zbanowany">Zbanowany</SelectItem>
+                    <SelectItem value="all">Wszyscy klienci ({clients.length})</SelectItem>
+                    <SelectItem value="nowy">
+                      🆕 Nowy ({clients.filter(c => getClientStatus(c) === 'nowy').length})
+                    </SelectItem>
+                    <SelectItem value="aktywny">
+                      ✅ Aktywny ({clients.filter(c => getClientStatus(c) === 'aktywny').length})
+                    </SelectItem>
+                    <SelectItem value="nieaktywny">
+                      ⏸️ Nieaktywny ({clients.filter(c => getClientStatus(c) === 'nieaktywny').length})
+                    </SelectItem>
+                    <SelectItem value="zbanowany">
+                      🚫 Zbanowany ({clients.filter(c => getClientStatus(c) === 'zbanowany').length})
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -349,12 +391,18 @@ export default function ClientList({ onNavigate }: ClientListProps) {
                 <Card key={client.id} className="hover:shadow-lg transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
-                      <CardTitle className="text-lg">
-                        {client.firstName} {client.lastName}
-                      </CardTitle>
-                      <Badge className={getStatusColor(status)}>
-                        {getStatusLabel(status)}
-                      </Badge>
+                      <div className="flex items-center gap-3">
+                        <CardTitle className="text-lg">
+                          {client.firstName} {client.lastName}
+                        </CardTitle>
+                        <Badge className={getStatusColor(status)}>
+                          {getStatusLabel(status)}
+                        </Badge>
+                      </div>
+                      <div className="text-right text-xs text-muted-foreground">
+                        <div>Dodano: {new Date(client.createdAt).toLocaleDateString('pl-PL')}</div>
+                        <div>Przez: {client.createdBy}</div>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -382,6 +430,12 @@ export default function ClientList({ onNavigate }: ClientListProps) {
                         <div className="flex items-center text-sm text-muted-foreground">
                           <MessageCircle className="h-4 w-4 mr-2" />
                           {client.messenger}
+                        </div>
+                      )}
+                      {client.birthDate && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <User className="h-4 w-4 mr-2" />
+                          Ur. {new Date(client.birthDate).toLocaleDateString('pl-PL')}
                         </div>
                       )}
                     </div>
