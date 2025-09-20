@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, User, Phone, Mail, Instagram, MessageCircle } from 'lucide-react';
 import backend from '~backend/client';
 import type { Client } from '~backend/client/list';
+import ClientDetailModal from './ClientDetailModal';
 
 interface ClientListProps {
   onNavigate: (view: 'menu' | 'form' | 'list' | 'clients' | 'calendar' | 'settings' | 'sms' | 'payments' | 'history') => void;
@@ -18,6 +19,10 @@ export default function ClientList({ onNavigate }: ClientListProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const clientsPerPage = 10;
+
+  // Modal state
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Pobierz klientów z API
   useEffect(() => {
@@ -60,6 +65,33 @@ export default function ClientList({ onNavigate }: ClientListProps) {
     }
   };
 
+  // Modal functions
+  const openModal = (client: Client) => {
+    setSelectedClient(client);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setSelectedClient(null);
+    setIsModalOpen(false);
+  };
+
+  const handleClientUpdate = (updatedClient: Client) => {
+    // Update client in the list
+    setClients(prevClients => 
+      prevClients.map(client => 
+        client.id === updatedClient.id ? updatedClient : client
+      )
+    );
+    
+    // Update filtered clients
+    setFilteredClients(prevFiltered => 
+      prevFiltered.map(client => 
+        client.id === updatedClient.id ? updatedClient : client
+      )
+    );
+  };
+
   // Paginacja
   const startIndex = (currentPage - 1) * clientsPerPage;
   const endIndex = startIndex + clientsPerPage;
@@ -78,130 +110,140 @@ export default function ClientList({ onNavigate }: ClientListProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Klienci</h1>
-            <p className="text-muted-foreground mt-2">
-              {filteredClients.length} klientów
-            </p>
-          </div>
-          <Button variant="outline" onClick={() => onNavigate('menu')}>
-            ← Menu główne
-          </Button>
-        </div>
-
-        {/* Search */}
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Szukaj po imieniu, nazwisku, telefonie, email, Instagram..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        {/* Clients Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {paginatedClients.map((client) => (
-            <Card key={client.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">
-                  {client.firstName} {client.lastName}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Contact Info */}
-                <div className="space-y-2">
-                  {client.phone && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Phone className="h-4 w-4 mr-2" />
-                      {client.phone}
-                    </div>
-                  )}
-                  {client.email && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Mail className="h-4 w-4 mr-2" />
-                      {client.email}
-                    </div>
-                  )}
-                  {client.instagram && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Instagram className="h-4 w-4 mr-2" />
-                      @{client.instagram}
-                    </div>
-                  )}
-                  {client.messenger && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      {client.messenger}
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2">
-                  <Button 
-                    size="sm" 
-                    className="flex-1"
-                    onClick={() => {/* TODO: Open modal */}}
-                  >
-                    Zobacz więcej
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-            >
-              ← Poprzednia
-            </Button>
-            
-            <span className="text-sm text-muted-foreground">
-              Strona {currentPage} z {totalPages}
-            </span>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Następna →
+    <>
+      <div className="min-h-screen bg-background p-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold">Klienci</h1>
+              <p className="text-muted-foreground mt-2">
+                {filteredClients.length} klientów
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => onNavigate('menu')}>
+              ← Menu główne
             </Button>
           </div>
-        )}
 
-        {/* Empty State */}
-        {filteredClients.length === 0 && (
-          <div className="text-center py-12">
-            <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
-              {searchTerm ? 'Nie znaleziono klientów' : 'Brak klientów'}
-            </h3>
-            <p className="text-muted-foreground">
-              {searchTerm 
-                ? 'Spróbuj zmienić kryteria wyszukiwania'
-                : 'Dodaj pierwszego klienta przez formularz wizyty'
-              }
-            </p>
+          {/* Search */}
+          <div className="mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Szukaj po imieniu, nazwisku, telefonie, email, Instagram..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
-        )}
+
+          {/* Clients Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {paginatedClients.map((client) => (
+              <Card key={client.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">
+                    {client.firstName} {client.lastName}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Contact Info */}
+                  <div className="space-y-2">
+                    {client.phone && (
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4 mr-2" />
+                        {client.phone}
+                      </div>
+                    )}
+                    {client.email && (
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Mail className="h-4 w-4 mr-2" />
+                        {client.email}
+                      </div>
+                    )}
+                    {client.instagram && (
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Instagram className="h-4 w-4 mr-2" />
+                        @{client.instagram}
+                      </div>
+                    )}
+                    {client.messenger && (
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        {client.messenger}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => openModal(client)}
+                    >
+                      Zobacz więcej
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                ← Poprzednia
+              </Button>
+              
+              <span className="text-sm text-muted-foreground">
+                Strona {currentPage} z {totalPages}
+              </span>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Następna →
+              </Button>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {filteredClients.length === 0 && (
+            <div className="text-center py-12">
+              <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">
+                {searchTerm ? 'Nie znaleziono klientów' : 'Brak klientów'}
+              </h3>
+              <p className="text-muted-foreground">
+                {searchTerm 
+                  ? 'Spróbuj zmienić kryteria wyszukiwania'
+                  : 'Dodaj pierwszego klienta przez formularz wizyty'
+                }
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Modal */}
+      <ClientDetailModal
+        client={selectedClient}
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        onClientUpdate={handleClientUpdate}
+      />
+    </>
   );
 }
