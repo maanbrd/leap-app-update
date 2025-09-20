@@ -207,11 +207,68 @@ export default function ClientDetailModal({
     setEventLoading(true);
     try {
       const updateData: any = { id: editingEvent };
+      const currentEvent = events.find(e => e.id === editingEvent);
       
-      if (editingEventField === 'price' || editingEventField === 'depositAmount') {
-        updateData[editingEventField] = parseInt(eventEditValue) || 0;
-      } else {
-        updateData[editingEventField] = eventEditValue;
+      // Enhanced validation with business logic
+      switch (editingEventField) {
+        case 'price':
+          const price = parseInt(eventEditValue);
+          if (isNaN(price) || price < 0) {
+            toast({
+              title: "Błąd walidacji",
+              description: "Cena musi być liczbą całkowitą większą lub równą 0",
+              variant: "destructive"
+            });
+            return;
+          }
+          // Check if new price is less than current deposit
+          if (currentEvent?.depositAmount && price < currentEvent.depositAmount) {
+            toast({
+              title: "Błąd walidacji", 
+              description: `Cena (${price} zł) nie może być mniejsza od zadatku (${currentEvent.depositAmount} zł)`,
+              variant: "destructive"
+            });
+            return;
+          }
+          updateData.price = price;
+          break;
+          
+        case 'depositAmount':
+          const depositAmount = parseInt(eventEditValue);
+          if (isNaN(depositAmount) || depositAmount < 0) {
+            toast({
+              title: "Błąd walidacji",
+              description: "Kwota zadatku musi być liczbą całkowitą większą lub równą 0",
+              variant: "destructive"
+            });
+            return;
+          }
+          // Check if deposit amount is greater than price
+          if (currentEvent && depositAmount > currentEvent.price) {
+            toast({
+              title: "Błąd walidacji",
+              description: `Zadatek (${depositAmount} zł) nie może być większy od ceny wizyty (${currentEvent.price} zł)`,
+              variant: "destructive"
+            });
+            return;
+          }
+          updateData.depositAmount = depositAmount;
+          break;
+          
+        case 'depositStatus':
+          if (!['zapłacony', 'niezapłacony', 'nie dotyczy'].includes(eventEditValue)) {
+            toast({
+              title: "Błąd walidacji",
+              description: "Nieprawidłowy status płatności",
+              variant: "destructive"
+            });
+            return;
+          }
+          updateData.depositStatus = eventEditValue;
+          break;
+          
+        default:
+          updateData[editingEventField] = eventEditValue;
       }
 
       const response = await backend.event.update(updateData);
@@ -543,16 +600,26 @@ export default function ClientDetailModal({
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-medium">Cena:</span>
                               {editingEvent === event.id && editingEventField === 'price' ? (
-                                <div className="flex gap-2">
-                                  <Input
-                                    type="number"
-                                    value={eventEditValue}
-                                    onChange={(e) => setEventEditValue(e.target.value)}
-                                    placeholder="0"
-                                    className="w-20"
-                                    disabled={eventLoading}
-                                  />
-                                  <span className="text-sm">zł</span>
+                                <div className="flex gap-2 items-center">
+                                  <div className="flex flex-col">
+                                    <div className="flex gap-1 items-center">
+                                      <Input
+                                        type="number"
+                                        value={eventEditValue}
+                                        onChange={(e) => setEventEditValue(e.target.value)}
+                                        placeholder="0"
+                                        className="w-20 text-xs"
+                                        disabled={eventLoading}
+                                        min="0"
+                                      />
+                                      <span className="text-xs">zł</span>
+                                    </div>
+                                    {event.depositAmount && parseInt(eventEditValue) < event.depositAmount && (
+                                      <span className="text-xs text-red-500 mt-1">
+                                        Min: {event.depositAmount} zł (zadatek)
+                                      </span>
+                                    )}
+                                  </div>
                                   <Button 
                                     size="sm" 
                                     onClick={saveEventField} 
@@ -575,10 +642,11 @@ export default function ClientDetailModal({
                                 </div>
                               ) : (
                                 <div 
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded"
+                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded transition-colors"
                                   onClick={() => startEditingEvent(event.id, 'price', event.price)}
+                                  title="Kliknij aby edytować cenę"
                                 >
-                                  <span className="text-sm">{formatPrice(event.price)}</span>
+                                  <span className="text-sm font-medium text-green-700">{formatPrice(event.price)}</span>
                                   <Edit3 className="h-3 w-3 text-muted-foreground" />
                                 </div>
                               )}
@@ -588,16 +656,30 @@ export default function ClientDetailModal({
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-medium">Zadatek:</span>
                               {editingEvent === event.id && editingEventField === 'depositAmount' ? (
-                                <div className="flex gap-2">
-                                  <Input
-                                    type="number"
-                                    value={eventEditValue}
-                                    onChange={(e) => setEventEditValue(e.target.value)}
-                                    placeholder="0"
-                                    className="w-20"
-                                    disabled={eventLoading}
-                                  />
-                                  <span className="text-sm">zł</span>
+                                <div className="flex gap-2 items-center">
+                                  <div className="flex flex-col">
+                                    <div className="flex gap-1 items-center">
+                                      <Input
+                                        type="number"
+                                        value={eventEditValue}
+                                        onChange={(e) => setEventEditValue(e.target.value)}
+                                        placeholder="0"
+                                        className="w-20 text-xs"
+                                        disabled={eventLoading}
+                                        min="0"
+                                        max={event.price}
+                                      />
+                                      <span className="text-xs">zł</span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground mt-1">
+                                      Max: {event.price} zł
+                                    </span>
+                                    {parseInt(eventEditValue) > event.price && (
+                                      <span className="text-xs text-red-500">
+                                        Przekracza cenę wizyty!
+                                      </span>
+                                    )}
+                                  </div>
                                   <Button 
                                     size="sm" 
                                     onClick={saveEventField} 
@@ -620,10 +702,11 @@ export default function ClientDetailModal({
                                 </div>
                               ) : (
                                 <div 
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded"
+                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded transition-colors"
                                   onClick={() => startEditingEvent(event.id, 'depositAmount', event.depositAmount || 0)}
+                                  title="Kliknij aby edytować zadatek"
                                 >
-                                  <span className="text-sm">{formatPrice(event.depositAmount || 0)}</span>
+                                  <span className="text-sm font-medium text-blue-700">{formatPrice(event.depositAmount || 0)}</span>
                                   <Edit3 className="h-3 w-3 text-muted-foreground" />
                                 </div>
                               )}
@@ -635,13 +718,13 @@ export default function ClientDetailModal({
                               {editingEvent === event.id && editingEventField === 'depositStatus' ? (
                                 <div className="flex gap-2">
                                   <Select value={eventEditValue} onValueChange={setEventEditValue}>
-                                    <SelectTrigger className="w-32">
+                                    <SelectTrigger className="w-32 text-xs">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="zapłacony">Zapłacony</SelectItem>
-                                      <SelectItem value="niezapłacony">Niezapłacony</SelectItem>
-                                      <SelectItem value="nie dotyczy">Nie dotyczy</SelectItem>
+                                      <SelectItem value="zapłacony">✅ Zapłacony</SelectItem>
+                                      <SelectItem value="niezapłacony">❌ Niezapłacony</SelectItem>
+                                      <SelectItem value="nie dotyczy">➖ Nie dotyczy</SelectItem>
                                     </SelectContent>
                                   </Select>
                                   <Button 
@@ -666,8 +749,9 @@ export default function ClientDetailModal({
                                 </div>
                               ) : (
                                 <div 
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded"
+                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted p-1 rounded transition-colors"
                                   onClick={() => startEditingEvent(event.id, 'depositStatus', event.depositStatus)}
+                                  title="Kliknij aby zmienić status płatności"
                                 >
                                   <Badge className={getDepositStatusColor(event.depositStatus)}>
                                     {event.depositStatus}
